@@ -1,84 +1,325 @@
 <!DOCTYPE html>
-<html>
-    <head>
-        <title>
-            Web Page with Sidebar.
-        </title>
-<style>
-    .sidebar{
-        height: 100%;
-        width: 200px;
-        position: fixed;
-        background-color:bisque;
-        top: 0;
-        left: 0;
-        padding:15px 0 0 15px;
-    }
-    .sidebar a{
-        display: block;
-        font-size: x-large;
-        text-decoration: none;
-        background-color: aqua;
-        border-radius: 14px;
-        width: 150px;
-        padding: 15px;
-        text-align: center;
-        margin-top: 10px;
-    }
-    .sidebar a:hover{
-        background-color:aquamarine;
-        box-shadow: 2px 0 15px 0;
-    }
-    .main{
-        margin-left: 220px;
-    }
-</style>
-    </head>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clean Reader Proxy</title>
+    
+    <script>
+    MathJax = {
+      tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']] },
+      startup: { typeset: false }
+    };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #f7f9fa;
+            --text-color: #2c3e50;
+            --accent-color: #3498db;
+            --surface-color: #ffffff;
+            --border-color: #e2e8f0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+        }
+
+        #toolbar {
+            background-color: var(--surface-color);
+            padding: 15px 20px;
+            display: flex;
+            gap: 10px;
+            /* Removed sticky from here so it can be hidden smoothly */
+        }
+
+        #url-input {
+            flex-grow: 1;
+            padding: 10px 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 16px;
+            outline: none;
+        }
+
+        button {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        /* 1. STICKY PATH BAR (Stays visible on scroll) */
+        #breadcrumbs {
+            padding: 12px 20px;
+            background-color: #e8f4fd;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 14px;
+            display: none; 
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            
+            /* These three lines make it stick to the top when scrolling */
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1); 
+        }
+
+        #breadcrumbs a {
+            color: var(--accent-color);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        #breadcrumbs a:hover {
+            text-decoration: underline;
+        }
+
+        .separator {
+            color: #7f8c8d;
+            font-size: 12px;
+        }
+
+        #reader-container {
+            max-width: 800px;
+            margin: 20px auto 40px;
+            background-color: var(--surface-color);
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+            min-height: 50vh;
+        }
+
+        #loader {
+            display: none;
+            text-align: center;
+            padding: 40px;
+            font-size: 18px;
+            color: #7f8c8d;
+        }
+
+        .clean-content h1, .clean-content h2, .clean-content h3 { color: #1a202c; margin-top: 1.5em; }
+        .clean-content a { color: var(--accent-color); text-decoration: none; }
+        .clean-content a:hover { text-decoration: underline; }
+        .clean-content img { max-width: 100%; height: auto; border-radius: 8px; margin: 20px 0; }
+        .clean-content table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        .clean-content th, .clean-content td { border: 1px solid var(--border-color); padding: 10px; }
+        
+        mjx-container { overflow-x: auto; overflow-y: hidden; max-width: 100%; }
+    </style>
+</head>
 <body>
-<div class="sidebar">
-    <a href="#Home">Home</a>
-    <a href="#Services">Services</a>
-    <a href="#About">About</a>
-    <a href="#Contact">Contact</a>
-</div>
-<div class="main">
-<h1>Hello in Home Page</h1>
-    <img src="9.jpg" alt="image">
-<p>This is main page section we can write here.</p>
-<p>This is main page section we can write here.</p>
-<p>This is main page section we can write here.</p>
-<p>This is main page section we can write here.</p>
-<p>This is main page section we can write here.</p>
-<p>This is main page section we can write here.</p>
-<p>This is main page section we can write here.</p>
-<p>This is main page section we can write here.</p>
-<p>This is main page section we can write here.</p>
-<p>This is main page section we can write here.</p>
-<p>This is main page section we can write here.</p>
-<p>This is main page section we can write here.</p>
-<p>This is main page section we can write here.</p>
-<p>This is main page section we can write here.</p>
-<p>This is main page section we can write here.</p>
-<p>This is main page section we can write here.</p>
-<p>This is main page section we can write here.</p>
-<p>This is main page section we can write here.</p>
-<p>This is main page section we can write here.</p>
-<p>This is main page section we can write here.</p>
-<p>This is main page section we can write here.</p>
-<p>This is main page section we can write here.</p>
-<p>This is main page section we can write here.</p>
-<p>This is main page section we can write here.</p>
-<p>This is main page section we can write here.</p>
-<p>This is main page section we can write here.</p>
-<p>This is main page section we can write here.</p>
-<p>This is main page section we can write here.</p>
-<p>This is main page section we can write here.</p>
-<p>This is main page section we can write here.</p>
-<p>This is main page section we can write here.</p>
-<p>This is main page section we can write here.</p>
-<p>This is main page section we can write here.</p>
-<p>This is main page section we can write here.</p>
-<p>This is main page section we can write here.</p>
-</div>
+
+    <div id="toolbar">
+        <input type="text" id="url-input" value="https://www.learninsta.com/" placeholder="Enter LearnInsta URL...">
+        <button onclick="triggerLoad()">Clean & Render</button>
+    </div>
+
+    <div id="breadcrumbs"></div>
+
+    <div id="loader">Fetching and cleaning page... Please wait.</div>
+    
+    <div id="reader-container" class="clean-content">
+        <!-- Content will be injected here automatically -->
+    </div>
+
+<script>
+        const container = document.getElementById('reader-container');
+        const loader = document.getElementById('loader');
+        const input = document.getElementById('url-input');
+        const breadcrumbsDiv = document.getElementById('breadcrumbs');
+        const toolbarDiv = document.getElementById('toolbar');
+
+        let pageHistory = [];
+
+        window.onload = () => {
+            loadPage("https://www.learninsta.com/", -1, "Home");
+        };
+
+        function triggerLoad() {
+            const url = input.value.trim();
+            if (url) {
+                pageHistory = []; 
+                loadPage(url, -1, "Home"); 
+            }
+        }
+
+        async function loadPage(targetUrl, historyIndex = -1, clickedText = null) {
+            container.innerHTML = '';
+            loader.style.display = 'block';
+            input.value = targetUrl;
+            window.scrollTo(0, 0);
+
+            try {
+                // --- NEW: PDF AND GOOGLE DRIVE DETECTOR ---
+                const isGoogleDrive = targetUrl.includes('drive.google.com/file/d/');
+                const isPdf = targetUrl.toLowerCase().split('?')[0].endsWith('.pdf'); // Ignore URL parameters
+
+                if (isGoogleDrive || isPdf) {
+                    loader.style.display = 'none';
+                    toolbarDiv.style.display = 'flex';
+                    
+                    let iframeUrl = targetUrl;
+                    
+                    if (isGoogleDrive) {
+                        // Google Drive requires '/preview' at the end of the URL to allow embedding
+                        iframeUrl = targetUrl.replace(/\/view.*$/, '/preview');
+                        if (!iframeUrl.endsWith('/preview')) {
+                            // If it didn't have /view to replace, just append it safely
+                            iframeUrl = iframeUrl.split('?')[0] + '/preview';
+                        }
+                    } else if (isPdf) {
+                        // For generic raw .pdf links, force them through Google's free PDF viewer
+                        iframeUrl = `https://docs.google.com/gview?url=${encodeURIComponent(targetUrl)}&embedded=true`;
+                    }
+
+                    // Render the PDF viewer inside our container
+                    container.innerHTML = `<iframe src="${iframeUrl}" width="100%" height="800px" style="border: none; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"></iframe>`;
+                    
+                    // Add the PDF to our history path
+                    let titleText = clickedText ? clickedText : "PDF Document";
+                    if (historyIndex === -1) {
+                        pageHistory.push({ url: targetUrl, title: titleText });
+                    } else {
+                        pageHistory = pageHistory.slice(0, historyIndex + 1);
+                    }
+                    renderBreadcrumbs();
+                    return; // EXIT EARLY: Do not run the rest of the web scraper!
+                }
+                // ------------------------------------------
+
+                // If it's a normal page, proceed with fetching and cleaning
+                const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+                const response = await fetch(proxyUrl);
+                
+                if (!response.ok) throw new Error(`Proxy blocked. Status: ${response.status}`);
+                
+                const rawHtml = await response.text();
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(rawHtml, 'text/html');
+
+                const elementsToRemove = [
+                    'header', 'footer', 'nav', 'aside', 'iframe', 'script', 'style', 
+                    'link', '.sidebar', '.widget-area', '.comments-area', '#comments',
+                    '.ez-toc-container', '.adsbygoogle', '.ast-header-breadcrumb'
+                ];
+                
+                elementsToRemove.forEach(selector => {
+                    doc.querySelectorAll(selector).forEach(el => el.remove());
+                });
+
+                let mainContent = doc.querySelector('.entry-content') || 
+                                  doc.querySelector('article') || doc.body;
+
+                const links = mainContent.querySelectorAll('a');
+                links.forEach(link => {
+                    let href = link.getAttribute('href');
+                    if (href) {
+                        if (href.startsWith('#') || href.startsWith('javascript:')) return; 
+
+                        const absoluteUrl = new URL(href, targetUrl).href;
+                        link.href = absoluteUrl; 
+                        link.onclick = (e) => {
+                            if (absoluteUrl.startsWith('http')) {
+                                e.preventDefault();
+                                
+                                let linkText = link.textContent.trim();
+                                if (!linkText) linkText = "Next Page"; 
+                                
+                                loadPage(absoluteUrl, -1, linkText);
+                            }
+                        };
+                    }
+                });
+
+                const images = mainContent.querySelectorAll('img');
+                images.forEach(img => {
+                    let src = img.getAttribute('src');
+                    if (src) img.src = new URL(src, targetUrl).href;
+                    img.removeAttribute('srcset'); 
+                });
+
+                let titleText = "Page";
+                if (clickedText) {
+                    titleText = clickedText;
+                } else {
+                    const pageTitleNode = doc.querySelector('.entry-title');
+                    if (pageTitleNode) titleText = pageTitleNode.textContent.trim();
+                }
+
+                if (historyIndex === -1) {
+                    pageHistory.push({ url: targetUrl, title: titleText });
+                } else {
+                    pageHistory = pageHistory.slice(0, historyIndex + 1);
+                }
+                
+                renderBreadcrumbs();
+
+                loader.style.display = 'none';
+                toolbarDiv.style.display = 'flex'; 
+                
+                const pageTitleNode = doc.querySelector('.entry-title');
+                if (pageTitleNode) container.appendChild(pageTitleNode);
+                
+                container.appendChild(mainContent);
+
+                if (window.MathJax) {
+                    MathJax.typesetPromise([container]).catch(err => console.error('Math error:', err));
+                }
+
+            } catch (error) {
+                console.error(error);
+                loader.style.display = 'none';
+                toolbarDiv.style.display = 'none';
+                container.innerHTML = `<h2 style="color: #e74c3c;">Failed to load page</h2><p>${error.message}</p>`;
+            }
+        }
+
+        function renderBreadcrumbs() {
+            breadcrumbsDiv.innerHTML = '';
+            
+            if (pageHistory.length === 0) {
+                breadcrumbsDiv.style.display = 'none';
+                return;
+            }
+
+            breadcrumbsDiv.style.display = 'flex';
+
+            pageHistory.forEach((page, index) => {
+                const link = document.createElement('a');
+                link.href = '#';
+                
+                link.textContent = page.title.length > 30 ? page.title.substring(0, 30) + '...' : page.title;
+                
+                link.onclick = (e) => {
+                    e.preventDefault();
+                    if (index === pageHistory.length - 1) return; 
+                    
+                    loadPage(page.url, index, page.title);
+                };
+                
+                breadcrumbsDiv.appendChild(link);
+
+                if (index < pageHistory.length - 1) {
+                    const separator = document.createElement('span');
+                    separator.className = 'separator';
+                    separator.textContent = '❯';
+                    breadcrumbsDiv.appendChild(separator);
+                }
+            });
+        }
+    </script>
 </body>
 </html>
