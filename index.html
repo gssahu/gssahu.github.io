@@ -1,325 +1,666 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Clean Reader Proxy</title>
-    
-    <script>
-    MathJax = {
-      tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']] },
-      startup: { typeset: false }
-    };
-    </script>
-    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StudyHub Proxy Reader</title>
 
-    <style>
-        :root {
-            --bg-color: #f7f9fa;
-            --text-color: #2c3e50;
-            --accent-color: #3498db;
-            --surface-color: #ffffff;
-            --border-color: #e2e8f0;
-        }
+<!-- MathJax Configuration -->
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']] },
+  startup: { typeset: false }
+};
+</script>
+<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            line-height: 1.6;
-            margin: 0;
-            padding: 0;
-        }
+<style>
+  /* Combined Theme Variables */
+  :root{
+    --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --accent:#5b8cff; --accent2:#ff9f5b;
+    --text:#e8eaf0; --muted:#9aa1b2; --border:#272b36; --radius:14px; --star:#ffcf5b;
+  }
+  html[data-theme="light"]{
+    --bg:#f4f6fb; --panel:#ffffff; --panel2:#eef1f8; --accent:#3b5fe0; --accent2:#e07a2e;
+    --text:#1b1e27; --muted:#5c6272; --border:#dde1ea;
+  }
+  
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    font-family:'Segoe UI', Roboto, -apple-system, sans-serif;
+    background:radial-gradient(circle at 20% 0%, color-mix(in srgb, var(--accent) 8%, var(--bg)) 0%, var(--bg) 60%);
+    color:var(--text); min-height:100vh; transition:background .2s, color .2s;
+    background-attachment: fixed;
+  }
 
-        #toolbar {
-            background-color: var(--surface-color);
-            padding: 15px 20px;
-            display: flex;
-            gap: 10px;
-            /* Removed sticky from here so it can be hidden smoothly */
-        }
+  /* StudyHub UI Styles */
+  header{
+    padding:24px 24px 16px; text-align:center; border-bottom:1px solid var(--border);
+    background:linear-gradient(180deg, rgba(91,140,255,.08), transparent);
+    position:relative;
+  }
+  header h1{
+    font-size:clamp(1.5rem,4vw,2.2rem); letter-spacing:.5px;
+    background:linear-gradient(90deg,var(--accent),var(--accent2));
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  header p{color:var(--muted); margin-top:6px; font-size:.9rem;}
+  .topbar{ max-width:1100px; margin:0 auto; display:flex; justify-content:flex-end; gap:10px; padding:10px 20px 0; }
+  .iconbtn{
+    background:var(--panel2); border:1px solid var(--border); color:var(--text);
+    border-radius:999px; padding:8px 14px; cursor:pointer; font-size:.82rem;
+    display:flex; align-items:center; gap:6px; transition:.15s;
+  }
+  .iconbtn:hover{border-color:var(--accent);}
+  .iconbtn.active{background:var(--accent); color:#fff; border-color:var(--accent);}
+  
+  main{max-width:1100px; margin:0 auto; padding:20px 20px 60px;}
+  .search{
+    display:block; width:100%; max-width:420px; margin:0 auto 20px; padding:12px 16px;
+    background:var(--panel2); border:1px solid var(--border); border-radius:999px;
+    color:var(--text); font-size:.95rem; outline:none;
+  }
+  .search:focus{border-color:var(--accent);}
+  .tabs{ display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin-bottom:26px; }
+  .tab{
+    padding:7px 16px; border-radius:999px; border:1px solid var(--border); background:var(--panel2);
+    color:var(--muted); font-size:.82rem; cursor:pointer; transition:.15s;
+  }
+  .tab:hover{border-color:var(--accent); color:var(--text);}
+  .tab.active{background:var(--accent); color:#fff; border-color:var(--accent);}
+  
+  .grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(150px,1fr)); gap:14px; }
+  .card{
+    background:var(--panel); border:1px solid var(--border); border-radius:var(--radius);
+    padding:20px 16px; text-align:center; cursor:pointer; transition:.18s ease; position:relative; overflow:hidden;
+  }
+  .card:hover{transform:translateY(-3px); border-color:var(--accent); box-shadow:0 10px 24px rgba(91,140,255,.15);}
+  .card .big{font-size:1.6rem; font-weight:700; color:var(--accent);}
+  .card .lbl{margin-top:6px; color:var(--muted); font-size:.85rem;}
+  .card .progress-ring{ position:absolute; top:8px; right:8px; font-size:.7rem; color:var(--accent2); font-weight:700; }
+  
+  .section-title{ font-size:1.05rem; margin:8px 0 16px; color:var(--text); font-weight:600; display:flex; align-items:center; gap:8px; }
+  .section-title .pill{ background:var(--accent); color:#fff; font-size:.7rem; padding:2px 10px; border-radius:999px; font-weight:700; }
+  
+  .linklist{list-style:none; display:flex; flex-direction:column; gap:10px;}
+  .linklist li a{
+    display:flex; justify-content:space-between; align-items:center;
+    background:var(--panel); border:1px solid var(--border); border-radius:10px;
+    padding:14px 18px; color:var(--text); text-decoration:none; transition:.15s; gap:10px;
+  }
+  .linklist li a:hover{border-color:var(--accent2); background:var(--panel2);}
+  .linklist li a .left{display:flex; align-items:center; gap:10px; flex:1;}
+  .linklist li a .arrow{color:var(--accent2); font-weight:700;}
+  .starbtn{ background:none; border:none; font-size:1.15rem; cursor:pointer; color:var(--border); line-height:1; padding:2px; }
+  .starbtn.on{color:var(--star);}
+  .visited-badge{ font-size:.68rem; background:var(--panel2); color:var(--muted); padding:2px 8px; border-radius:999px; border:1px solid var(--border); }
+  .empty{color:var(--muted); text-align:center; padding:40px 0;}
+  
+  .statbar{ max-width:640px; margin:0 auto 20px; display:flex; justify-content:center; gap:22px; font-size:.82rem; color:var(--muted); }
+  .statbar b{color:var(--accent); font-size:1rem;}
+  
+  /* Proxy Reader Styles */
+  #breadcrumbs {
+    padding: 12px 20px; background-color: var(--panel2); border-bottom: 1px solid var(--border);
+    font-size: 14px; display: none; flex-wrap: wrap; gap: 8px; align-items: center;
+    position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 6px rgba(0,0,0,0.1); 
+  }
+  #breadcrumbs a { color: var(--accent); text-decoration: none; font-weight: 500; cursor: pointer;}
+  #breadcrumbs a:hover { text-decoration: underline; }
+  .separator { color: var(--muted); font-size: 12px; }
 
-        #url-input {
-            flex-grow: 1;
-            padding: 10px 15px;
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            font-size: 16px;
-            outline: none;
-        }
+  #reader-view { display: none; }
+  #reader-container {
+    max-width: 800px; margin: 20px auto 40px; background-color: var(--panel);
+    padding: 40px; border-radius: 12px; border: 1px solid var(--border);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.02); min-height: 50vh; color: var(--text);
+  }
+  #loader { display: none; text-align: center; padding: 40px; font-size: 18px; color: var(--muted); }
 
-        button {
-            background-color: var(--accent-color);
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 6px;
-            font-size: 16px;
-            cursor: pointer;
-            font-weight: 600;
-        }
+  .clean-content h1, .clean-content h2, .clean-content h3 { color: var(--text); margin-top: 1.5em; }
+  .clean-content a { color: var(--accent); text-decoration: none; }
+  .clean-content a:hover { text-decoration: underline; }
+  .clean-content img { max-width: 100%; height: auto; border-radius: 8px; margin: 20px 0; }
+  .clean-content table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+  .clean-content th, .clean-content td { border: 1px solid var(--border); padding: 10px; }
+  
+  mjx-container { overflow-x: auto; overflow-y: hidden; max-width: 100%; }
 
-        /* 1. STICKY PATH BAR (Stays visible on scroll) */
-        #breadcrumbs {
-            padding: 12px 20px;
-            background-color: #e8f4fd;
-            border-bottom: 1px solid var(--border-color);
-            font-size: 14px;
-            display: none; 
-            flex-wrap: wrap;
-            gap: 8px;
-            align-items: center;
-            
-            /* These three lines make it stick to the top when scrolling */
-            position: sticky;
-            top: 0;
-            z-index: 1000;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.1); 
-        }
-
-        #breadcrumbs a {
-            color: var(--accent-color);
-            text-decoration: none;
-            font-weight: 500;
-        }
-
-        #breadcrumbs a:hover {
-            text-decoration: underline;
-        }
-
-        .separator {
-            color: #7f8c8d;
-            font-size: 12px;
-        }
-
-        #reader-container {
-            max-width: 800px;
-            margin: 20px auto 40px;
-            background-color: var(--surface-color);
-            padding: 40px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.02);
-            min-height: 50vh;
-        }
-
-        #loader {
-            display: none;
-            text-align: center;
-            padding: 40px;
-            font-size: 18px;
-            color: #7f8c8d;
-        }
-
-        .clean-content h1, .clean-content h2, .clean-content h3 { color: #1a202c; margin-top: 1.5em; }
-        .clean-content a { color: var(--accent-color); text-decoration: none; }
-        .clean-content a:hover { text-decoration: underline; }
-        .clean-content img { max-width: 100%; height: auto; border-radius: 8px; margin: 20px 0; }
-        .clean-content table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-        .clean-content th, .clean-content td { border: 1px solid var(--border-color); padding: 10px; }
-        
-        mjx-container { overflow-x: auto; overflow-y: hidden; max-width: 100%; }
-    </style>
+ #toolbar{
+    background:var(--surface); padding:14px 20px; display:flex; gap:12px; align-items:center;
+    border-bottom:1px solid var(--border); flex-wrap:wrap;
+  }
+  #toolbar h1{font-size:1.15rem; margin-right:auto; color:var(--accent);}
+  #toolbar button{
+    background:var(--accent); color:#fff; border:none; padding:8px 16px; border-radius:6px;
+    font-size:.85rem; cursor:pointer; font-weight:600;
+  }
+  #toolbar button.secondary{background:var(--panel2); color:var(--text);}
+</style>
 </head>
 <body>
 
-    <div id="toolbar">
-        <input type="text" id="url-input" value="https://www.learninsta.com/" placeholder="Enter LearnInsta URL...">
-        <button onclick="triggerLoad()">Clean & Render</button>
+<div id="toolbar">
+  <h1>📚 StudyHub Reader</h1>
+  <button class="secondary" onclick="goHome()">🏠 Home</button>
+    <button class="secondary" id="themeBtn" onclick="toggleTheme()">🌙 Theme</button>
+    <button class="secondary" id="favBtn" onclick="toggleFavView()">⭐ Favorites (<span id="favCount">0</span>)</button>
+</div>
+
+<!-- Breadcrumbs (Hidden on Home) -->
+<div id="breadcrumbs"></div>
+
+<!-- STUDYHUB HOME VIEW -->
+<div id="home-view">
+  <main>
+    <div class="statbar">
+      <div>⭐ Favorites: <b id="statFav">0</b></div>
+      <div>✅ Visited: <b id="statVisited">0</b></div>
+      <div>📘 Total links: <b id="statTotal">0</b></div>
     </div>
 
-    <div id="breadcrumbs"></div>
+    <input type="text" class="search" id="searchBox" placeholder="🔍 Search class, subject or chapter...">
 
-    <div id="loader">Fetching and cleaning page... Please wait.</div>
-    
-    <div id="reader-container" class="clean-content">
-        <!-- Content will be injected here automatically -->
+    <div class="tabs" id="tabs">
+      <div class="tab active" data-cat="all" onclick="setCategory('all')">All</div>
+      <div class="tab" data-cat="ncert" onclick="setCategory('ncert')">NCERT</div>
+      <div class="tab" data-cat="rd" onclick="setCategory('rd')">RD Sharma</div>
+      <div class="tab" data-cat="icse" onclick="setCategory('icse')">ICSE</div>
+      <div class="tab" data-cat="extra" onclick="setCategory('extra')">Extra Resources</div>
     </div>
+
+    <div id="content"></div>
+  </main>
+</div>
+
+<!-- PROXY READER VIEW -->
+<div id="reader-view">
+  <div id="loader">Fetching and cleaning page... Please wait.</div>
+  <div id="reader-container" class="clean-content"></div>
+</div>
 
 <script>
-        const container = document.getElementById('reader-container');
-        const loader = document.getElementById('loader');
-        const input = document.getElementById('url-input');
-        const breadcrumbsDiv = document.getElementById('breadcrumbs');
-        const toolbarDiv = document.getElementById('toolbar');
+// ==========================================
+// 1. DATA & STUDYHUB LOGIC
+// ==========================================
+const BASE = "https://www.learninsta.com/";
 
-        let pageHistory = [];
+const DATA = {
+  1: { label:"Class 1", subjects:[
+      {name:"NCERT Solutions", icon:"📘", url:"ncert-solutions-for-class-1/", cat:"ncert"}
+  ]},
+  2: { label:"Class 2", subjects:[
+      {name:"NCERT Solutions", icon:"📘", url:"ncert-solutions-for-class-2/", cat:"ncert"}
+  ]},
+  3: { label:"Class 3", subjects:[
+      {name:"NCERT Solutions", icon:"📘", url:"ncert-solutions-for-class-3/", cat:"ncert"}
+  ]},
+  4: { label:"Class 4", subjects:[
+      {name:"NCERT Solutions", icon:"📘", url:"ncert-solutions-for-class-4/", cat:"ncert"}
+  ]},
+  5: { label:"Class 5", subjects:[
+      {name:"NCERT Solutions", icon:"📘", url:"ncert-solutions-for-class-5/", cat:"ncert"}
+  ]},
+  6: { label:"Class 6", subjects:[
+      {name:"Overview", icon:"📘", url:"ncert-solutions-for-class-6/", cat:"ncert"},
+      {name:"Maths", icon:"➗", url:"ncert-solutions-for-class-6-maths/", cat:"ncert"},
+      {name:"Science", icon:"🔬", url:"ncert-solutions-for-class-6-science/", cat:"ncert"},
+      {name:"Social Science", icon:"🌍", url:"ncert-solutions-for-class-6-social-science/", cat:"ncert"},
+      {name:"— History", icon:"🏛️", url:"ncert-solutions-for-class-6-social-science-history/", cat:"ncert"},
+      {name:"— Geography", icon:"🗺️", url:"ncert-solutions-for-class-6-social-science-geography/", cat:"ncert"},
+      {name:"— Civics", icon:"⚖️", url:"ncert-solutions-for-class-6-social-science-civics/", cat:"ncert"},
+      {name:"English", icon:"🔤", url:"ncert-solutions-for-class-6-english/", cat:"ncert"},
+      {name:"— Honeysuckle", icon:"📖", url:"ncert-solutions-for-class-6-english-honeysuckle/", cat:"ncert"},
+      {name:"— A Pact with the Sun", icon:"📖", url:"ncert-solutions-for-class-6-english-a-pact-with-the-sun/", cat:"ncert"},
+      {name:"Hindi", icon:"अ", url:"ncert-solutions-for-class-6-hindi/", cat:"ncert"},
+      {name:"— Vasant", icon:"📖", url:"ncert-solutions-for-class-6-hindi-vasant/", cat:"ncert"},
+      {name:"Sanskrit", icon:"संस्कृत", url:"ncert-solutions-for-class-6-sanskrit/", cat:"ncert"}
+  ]},
+  7: { label:"Class 7", subjects:[
+      {name:"Overview", icon:"📘", url:"ncert-solutions-for-class-7/", cat:"ncert"},
+      {name:"Maths", icon:"➗", url:"ncert-solutions-for-class-7-maths/", cat:"ncert"},
+      {name:"Science", icon:"🔬", url:"ncert-solutions-for-class-7-science/", cat:"ncert"},
+      {name:"Social Science", icon:"🌍", url:"ncert-solutions-for-class-7-social-science/", cat:"ncert"},
+      {name:"— History", icon:"🏛️", url:"ncert-solutions-for-class-7-social-science-history/", cat:"ncert"},
+      {name:"— Geography", icon:"🗺️", url:"ncert-solutions-for-class-7-social-science-geography/", cat:"ncert"},
+      {name:"— Civics", icon:"⚖️", url:"ncert-solutions-for-class-7-social-science-civics/", cat:"ncert"},
+      {name:"English", icon:"🔤", url:"ncert-solutions-for-class-7-english/", cat:"ncert"},
+      {name:"— Honeycomb", icon:"📖", url:"ncert-solutions-for-class-7-english-honeycomb/", cat:"ncert"},
+      {name:"— An Alien Hand", icon:"📖", url:"ncert-solutions-for-class-7-english-an-alien-hand/", cat:"ncert"},
+      {name:"Hindi", icon:"अ", url:"ncert-solutions-for-class-7-hindi/", cat:"ncert"},
+      {name:"— Vasant", icon:"📖", url:"ncert-solutions-for-class-7-hindi-vasant/", cat:"ncert"},
+      {name:"Sanskrit", icon:"संस्कृत", url:"ncert-solutions-for-class-7-sanskrit/", cat:"ncert"}
+  ]},
+  8: { label:"Class 8", subjects:[
+      {name:"Overview", icon:"📘", url:"ncert-solutions-for-class-8/", cat:"ncert"},
+      {name:"Maths", icon:"➗", url:"ncert-solutions-for-class-8-maths/", cat:"ncert"},
+      {name:"Science", icon:"🔬", url:"ncert-solutions-for-class-8-science/", cat:"ncert"},
+      {name:"Social Science", icon:"🌍", url:"ncert-solutions-for-class-8-social-science/", cat:"ncert"},
+      {name:"— History", icon:"🏛️", url:"ncert-solutions-for-class-8-social-science-history/", cat:"ncert"},
+      {name:"— Geography", icon:"🗺️", url:"ncert-solutions-for-class-8-social-science-geography/", cat:"ncert"},
+      {name:"— Civics", icon:"⚖️", url:"ncert-solutions-for-class-8-social-science-civics/", cat:"ncert"},
+      {name:"English", icon:"🔤", url:"ncert-solutions-for-class-8-english/", cat:"ncert"},
+      {name:"— Honeydew", icon:"📖", url:"ncert-solutions-for-class-8-english-honeydew/", cat:"ncert"},
+      {name:"— It So Happened", icon:"📖", url:"ncert-solutions-for-class-8-english-it-so-happened/", cat:"ncert"},
+      {name:"Hindi", icon:"अ", url:"ncert-solutions-for-class-8-hindi/", cat:"ncert"},
+      {name:"— Vasant", icon:"📖", url:"ncert-solutions-for-class-8-hindi-vasant/", cat:"ncert"},
+      {name:"Sanskrit", icon:"संस्कृत", url:"ncert-solutions-for-class-8-sanskrit/", cat:"ncert"},
+      {name:"RD Sharma Maths", icon:"📐", url:"rd-sharma-class-8-solutions/", cat:"rd"}
+  ]},
+  9: { label:"Class 9", subjects:[
+      {name:"Overview", icon:"📘", url:"ncert-solutions-for-class-9/", cat:"ncert"},
+      {name:"Maths", icon:"➗", url:"ncert-solutions-for-class-9-maths/", cat:"ncert"},
+      {name:"Science", icon:"🔬", url:"ncert-solutions-for-class-9-science/", cat:"ncert"},
+      {name:"Social Science", icon:"🌍", url:"ncert-solutions-for-class-9-social-science/", cat:"ncert"},
+      {name:"— History", icon:"🏛️", url:"ncert-solutions-for-class-9-social-science-history/", cat:"ncert"},
+      {name:"— Geography", icon:"🗺️", url:"ncert-solutions-for-class-9-social-science-geography/", cat:"ncert"},
+      {name:"— Civics", icon:"⚖️", url:"ncert-solutions-for-class-9-social-science-civics/", cat:"ncert"},
+      {name:"— Economics", icon:"💰", url:"ncert-solutions-for-class-9-social-science-economics/", cat:"ncert"},
+      {name:"English", icon:"🔤", url:"ncert-solutions-for-class-9-english/", cat:"ncert"},
+      {name:"— Beehive", icon:"📖", url:"ncert-solutions-for-class-9-english-beehive/", cat:"ncert"},
+      {name:"— Moments", icon:"📖", url:"ncert-solutions-for-class-9-english-moments/", cat:"ncert"},
+      {name:"Hindi", icon:"अ", url:"ncert-solutions-for-class-9-hindi/", cat:"ncert"},
+      {name:"— Kshitij", icon:"📖", url:"ncert-solutions-for-class-9-hindi-kshitij/", cat:"ncert"},
+      {name:"— Kritika", icon:"📖", url:"ncert-solutions-for-class-9-hindi-kritika/", cat:"ncert"},
+      {name:"— Sparsh", icon:"📖", url:"ncert-solutions-for-class-9-hindi-sparsh/", cat:"ncert"},
+      {name:"— Sanchayan", icon:"📖", url:"ncert-solutions-for-class-9-hindi-sanchayan/", cat:"ncert"},
+      {name:"Sanskrit (Shemushi)", icon:"संस्कृत", url:"ncert-solutions-for-class-9-sanskrit/", cat:"ncert"},
+      {name:"RD Sharma Maths", icon:"📐", url:"rd-sharma-class-9-solutions/", cat:"rd"}
+  ]},
+  10: { label:"Class 10", subjects:[
+      {name:"Overview", icon:"📘", url:"ncert-solutions-for-class-10/", cat:"ncert"},
+      {name:"Maths", icon:"➗", url:"ncert-solutions-for-class-10-maths/", cat:"ncert"},
+      {name:"Science", icon:"🔬", url:"ncert-solutions-for-class-10-science/", cat:"ncert"},
+      {name:"Social Science", icon:"🌍", url:"ncert-solutions-for-class-10-social-science/", cat:"ncert"},
+      {name:"— History", icon:"🏛️", url:"ncert-solutions-for-class-10-social-science-history/", cat:"ncert"},
+      {name:"— Geography", icon:"🗺️", url:"ncert-solutions-for-class-10-social-science-geography/", cat:"ncert"},
+      {name:"— Civics", icon:"⚖️", url:"ncert-solutions-for-class-10-social-science-civics/", cat:"ncert"},
+      {name:"— Economics", icon:"💰", url:"ncert-solutions-for-class-10-social-science-economics/", cat:"ncert"},
+      {name:"English", icon:"🔤", url:"ncert-solutions-for-class-10-english/", cat:"ncert"},
+      {name:"— First Flight", icon:"📖", url:"ncert-solutions-for-class-10-english-first-flight/", cat:"ncert"},
+      {name:"— Footprints w/o Feet", icon:"📖", url:"ncert-solutions-for-class-10-english-footprints-without-feet/", cat:"ncert"},
+      {name:"— Literature Reader", icon:"📖", url:"ncert-solutions-for-class-10-english-literature-reader/", cat:"ncert"},
+      {name:"— Main Course Book", icon:"📖", url:"ncert-solutions-for-class-10-english-main-course-book/", cat:"ncert"},
+      {name:"Hindi", icon:"अ", url:"ncert-solutions-for-class-10-hindi/", cat:"ncert"},
+      {name:"— Kshitij", icon:"📖", url:"ncert-solutions-for-class-10-hindi-kshitij/", cat:"ncert"},
+      {name:"— Kritika", icon:"📖", url:"ncert-solutions-for-class-10-hindi-kritika/", cat:"ncert"},
+      {name:"— Sparsh", icon:"📖", url:"ncert-solutions-for-class-10-hindi-sparsh/", cat:"ncert"},
+      {name:"— Sanchayan", icon:"📖", url:"ncert-solutions-for-class-10-hindi-sanchayan/", cat:"ncert"},
+      {name:"Sanskrit (Shemushi)", icon:"संस्कृत", url:"ncert-solutions-for-class-10-sanskrit/", cat:"ncert"},
+      {name:"RD Sharma Maths", icon:"📐", url:"rd-sharma-class-10-solutions/", cat:"rd"},
+      {name:"ML Aggarwal (ICSE)", icon:"📐", url:"ml-aggarwal-icse-solutions-for-class-10-maths/", cat:"icse"},
+      {name:"Selina Concise Maths (ICSE)", icon:"📐", url:"selina-concise-mathematics-class-10-icse-solutions/", cat:"icse"}
+  ]},
+  11: { label:"Class 11", subjects:[
+      {name:"Overview", icon:"📘", url:"ncert-solutions-for-class-11/", cat:"ncert"},
+      {name:"Physics", icon:"⚛️", url:"ncert-solutions-for-class-11-physics/", cat:"ncert"},
+      {name:"Chemistry", icon:"🧪", url:"ncert-solutions-for-class-11-chemistry/", cat:"ncert"},
+      {name:"Biology", icon:"🧬", url:"ncert-solutions-for-class-11-biology/", cat:"ncert"},
+      {name:"English", icon:"🔤", url:"ncert-solutions-for-class-11-english/", cat:"ncert"},
+      {name:"RD Sharma Maths", icon:"📐", url:"rd-sharma-class-11-solutions/", cat:"rd"}
+  ]},
+  12: { label:"Class 12", subjects:[
+      {name:"Overview", icon:"📘", url:"ncert-solutions-for-class-12/", cat:"ncert"},
+      {name:"Physics", icon:"⚛️", url:"ncert-solutions-for-class-12-physics/", cat:"ncert"},
+      {name:"Chemistry", icon:"🧪", url:"ncert-solutions-for-class-12-chemistry/", cat:"ncert"},
+      {name:"Biology", icon:"🧬", url:"ncert-solutions-for-class-12-biology/", cat:"ncert"},
+      {name:"History", icon:"🏛️", url:"ncert-solutions-for-class-12-history/", cat:"ncert"},
+      {name:"English", icon:"🔤", url:"ncert-solutions-for-class-12-english/", cat:"ncert"},
+      {name:"RD Sharma Maths", icon:"📐", url:"rd-sharma-class-12-solutions/", cat:"rd"}
+  ]}
+};
 
-        window.onload = () => {
-            loadPage("https://www.learninsta.com/", -1, "Home");
-        };
+const EXTRA_RESOURCES = [
+  {name:"CBSE Sample Papers", icon:"📝", url:"cbse-sample-papers/", cat:"extra"},
+  {name:"CBSE Notes", icon:"🗒️", url:"cbse-notes/", cat:"extra"},
+  {name:"NCERT Books", icon:"📕", url:"ncert-books/", cat:"extra"},
+  {name:"English Grammar", icon:"✍️", url:"english-grammar/", cat:"extra"},
+  {name:"English Summaries", icon:"📄", url:"english-summaries/", cat:"extra"},
+  {name:"Unseen Passages", icon:"🔎", url:"unseen-passage/", cat:"extra"},
+  {name:"MCQ Questions", icon:"❓", url:"mcq-questions/", cat:"extra"},
+  {name:"Extra Questions", icon:"➕", url:"extra-questions/", cat:"extra"},
+  {name:"CUET Exam", icon:"🎓", url:"cuet-exam/", cat:"extra"}
+];
 
-        function triggerLoad() {
-            const url = input.value.trim();
-            if (url) {
-                pageHistory = []; 
-                loadPage(url, -1, "Home"); 
+function loadSet(key){ try{ return new Set(JSON.parse(localStorage.getItem(key)||"[]")); }catch(e){ return new Set(); } }
+function saveSet(key, set){ localStorage.setItem(key, JSON.stringify([...set])); }
+
+let favorites = loadSet("studyhub_favorites");
+let visited = loadSet("studyhub_visited");
+let theme = localStorage.getItem("studyhub_theme") || "dark";
+document.documentElement.setAttribute("data-theme", theme);
+
+let state = { view:"home", cls:null, category:"all", favOnly:false };
+let pageHistory = []; // Tracks proxy path
+
+function allLinks(){
+  let out = [];
+  Object.keys(DATA).forEach(c=>{ DATA[c].subjects.forEach(s=> out.push({cls:c, ...s})); });
+  EXTRA_RESOURCES.forEach(r=> out.push({cls:null, ...r}));
+  return out;
+}
+
+function markVisited(url){
+  visited.add(url); saveSet("studyhub_visited", visited); updateStats();
+}
+
+function toggleFav(url, ev){
+  if(ev) ev.stopPropagation();
+  if(favorites.has(url)) favorites.delete(url); else favorites.add(url);
+  saveSet("studyhub_favorites", favorites);
+  updateStats(); render();
+}
+
+function updateStats(){
+  document.getElementById("favCount").textContent = favorites.size;
+  document.getElementById("statFav").textContent = favorites.size;
+  document.getElementById("statVisited").textContent = visited.size;
+  document.getElementById("statTotal").textContent = allLinks().length;
+}
+
+function toggleTheme(){
+  theme = theme === "dark" ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", theme);
+  localStorage.setItem("studyhub_theme", theme);
+  document.getElementById("themeBtn").textContent = theme === "dark" ? "🌙 Theme" : "☀️ Theme";
+}
+document.getElementById("themeBtn").textContent = theme === "dark" ? "🌙 Theme" : "☀️ Theme";
+
+function toggleFavView(){
+  state.favOnly = !state.favOnly;
+  document.getElementById("favBtn").classList.toggle("active", state.favOnly);
+  render();
+}
+
+function setCategory(cat){
+  state.category = cat;
+  document.querySelectorAll(".tab").forEach(t=> t.classList.toggle("active", t.dataset.cat === cat));
+  render();
+}
+
+// MODIFIED: Injects link into the proxy reader instead of navigating away
+function linkHTML(r, label){
+  const absoluteUrl = BASE + r.url;
+  const isFav = favorites.has(r.url);
+  const isVisited = visited.has(r.url);
+  return `<li><a href="${absoluteUrl}" onclick="event.preventDefault(); openProxyFromHome('${absoluteUrl}', '${label}', '${r.url}')">
+      <span class="left">${r.icon} ${label}${isVisited?'<span class="visited-badge">visited</span>':''}</span>
+      <span style="display:flex; align-items:center; gap:10px;">
+        <button class="starbtn ${isFav?'on':''}" onclick="toggleFav('${r.url}', event)">★</button>
+        <span class="arrow">↗</span>
+      </span>
+    </a></li>`;
+}
+
+function filterByCategory(list){
+  if(state.category === "all") return list;
+  return list.filter(r => r.cat === state.category);
+}
+
+function render(){
+  const content = document.getElementById("content");
+  updateStats();
+
+  if(state.favOnly){
+    let favs = allLinks().filter(r => favorites.has(r.url));
+    favs = filterByCategory(favs);
+    let html = `<div class="section-title">⭐ Your Favorites <span class="pill">${favs.length}</span></div>`;
+    if(favs.length === 0) html += `<div class="empty">No favorites yet. Click the ☆ star next to any resource to save it.</div>`;
+    else {
+      html += `<ul class="linklist">`;
+      favs.forEach(r=> html += linkHTML(r, r.cls ? `Class ${r.cls} — ${r.name}` : r.name));
+      html += `</ul>`;
+    }
+    content.innerHTML = html;
+    return;
+  }
+
+  if(state.view === "home"){
+    let html = "";
+    if(state.category === "extra"){
+      let list = filterByCategory(EXTRA_RESOURCES.map(r=>({cls:null,...r})));
+      html += `<div class="section-title">Extra Resources <span class="pill">${list.length}</span></div><ul class="linklist">`;
+      list.forEach(r=> html += linkHTML(r, r.name));
+      html += `</ul>`;
+    } else {
+      html += `<div class="section-title">Select Your Class <span class="pill">1–12</span></div><div class="grid">`;
+      Object.keys(DATA).forEach(c=>{
+        const subs = filterByCategory(DATA[c].subjects);
+        if(subs.length === 0) return;
+        const visitedCount = subs.filter(s=>visited.has(s.url)).length;
+        html += `<div class="card" onclick="selectClass(${c})">
+          ${visitedCount>0?`<div class="progress-ring">${visitedCount}/${subs.length}</div>`:''}
+          <div class="big">${c}</div><div class="lbl">Class ${c}</div></div>`;
+      });
+      html += `</div>`;
+
+      if(state.category === "all"){
+        html += `<div class="section-title" style="margin-top:36px">More Resources <span class="pill">Extra</span></div><ul class="linklist">`;
+        EXTRA_RESOURCES.forEach(r=> html += linkHTML({cls:null,...r}, r.name));
+        html += `</ul>`;
+      }
+    }
+    content.innerHTML = html;
+  } else if(state.view === "class"){
+    const cls = DATA[state.cls];
+    const subs = filterByCategory(cls.subjects);
+    let html = `<div class="section-title">
+      <span onclick="goHome()" style="cursor:pointer; color:var(--accent);">Classes</span> 
+      <span style="color:var(--muted); margin:0 5px;">›</span> ${cls.label} Subjects <span class="pill">${subs.length}</span>
+    </div>`;
+    if(subs.length === 0) html += `<div class="empty">No resources in this category.</div>`;
+    else {
+      html += `<ul class="linklist">`;
+      subs.forEach(s=> html += linkHTML({cls:state.cls, ...s}, s.name));
+      html += `</ul>`;
+    }
+    content.innerHTML = html;
+  }
+}
+
+function selectClass(c){ state.view="class"; state.cls=Number(c); state.favOnly=false; document.getElementById("favBtn").classList.remove("active"); render(); }
+
+document.getElementById("searchBox").addEventListener("input", (e)=>{
+  const q = e.target.value.trim().toLowerCase();
+  if(!q){ render(); return; }
+  let results = allLinks().filter(r=> r.name.toLowerCase().includes(q) || (r.cls && ("class "+r.cls).includes(q)));
+  results = filterByCategory(results);
+  const content = document.getElementById("content");
+  let html = `<div class="section-title">Search Results <span class="pill">${results.length}</span></div>`;
+  if(results.length === 0) html += `<div class="empty">No matches found.</div>`;
+  else {
+    html += `<ul class="linklist">`;
+    results.forEach(r=> html += linkHTML(r, r.cls ? `Class ${r.cls} — ${r.name}` : r.name));
+    html += `</ul>`;
+  }
+  content.innerHTML = html;
+});
+
+
+// ==========================================
+// 2. PROXY READER LOGIC (MERGED)
+// ==========================================
+
+const homeView = document.getElementById('home-view');
+const readerView = document.getElementById('reader-view');
+const container = document.getElementById('reader-container');
+const loader = document.getElementById('loader');
+const breadcrumbsDiv = document.getElementById('breadcrumbs');
+
+function goHome(){ 
+  // Switch UI back to StudyHub
+  homeView.style.display = 'block';
+  readerView.style.display = 'none';
+  breadcrumbsDiv.style.display = 'none';
+  
+  // Reset StudyHub state
+  state.view="home"; 
+  state.cls=null; 
+  state.favOnly=false; 
+  document.getElementById("favBtn").classList.remove("active"); 
+  document.getElementById("searchBox").value=""; 
+  
+  pageHistory = [];
+  render(); 
+}
+
+function openProxyFromHome(absoluteUrl, label, rawUrl) {
+    markVisited(rawUrl);
+    pageHistory = []; 
+    // Start breadcrumbs with 'Home' to allow returning to the StudyHub Grid
+    pageHistory.push({ url: "home", title: "🏠 Home" });
+    loadPage(absoluteUrl, -1, label);
+}
+
+async function loadPage(targetUrl, historyIndex = -1, clickedText = null) {
+    // If user clicked Home in breadcrumbs, trigger the reset
+    if (targetUrl === "home") {
+        goHome();
+        return;
+    }
+
+    // Switch UI to Proxy view
+    homeView.style.display = 'none';
+    readerView.style.display = 'block';
+    
+    container.innerHTML = '';
+    loader.style.display = 'block';
+    window.scrollTo(0, 0);
+
+    try {
+        // Check for PDF / Google Drive links first
+        const isGoogleDrive = targetUrl.includes('drive.google.com/file/d/');
+        const isPdf = targetUrl.toLowerCase().split('?')[0].endsWith('.pdf');
+
+        if (isGoogleDrive || isPdf) {
+            loader.style.display = 'none';
+            let iframeUrl = targetUrl;
+            if (isGoogleDrive) {
+                iframeUrl = targetUrl.replace(/\/view.*$/, '/preview');
+                if (!iframeUrl.endsWith('/preview')) iframeUrl = iframeUrl.split('?')[0] + '/preview';
+            } else if (isPdf) {
+                iframeUrl = `https://docs.google.com/gview?url=${encodeURIComponent(targetUrl)}&embedded=true`;
             }
-        }
-
-        async function loadPage(targetUrl, historyIndex = -1, clickedText = null) {
-            container.innerHTML = '';
-            loader.style.display = 'block';
-            input.value = targetUrl;
-            window.scrollTo(0, 0);
-
-            try {
-                // --- NEW: PDF AND GOOGLE DRIVE DETECTOR ---
-                const isGoogleDrive = targetUrl.includes('drive.google.com/file/d/');
-                const isPdf = targetUrl.toLowerCase().split('?')[0].endsWith('.pdf'); // Ignore URL parameters
-
-                if (isGoogleDrive || isPdf) {
-                    loader.style.display = 'none';
-                    toolbarDiv.style.display = 'none';
-                    
-                    let iframeUrl = targetUrl;
-                    
-                    if (isGoogleDrive) {
-                        // Google Drive requires '/preview' at the end of the URL to allow embedding
-                        iframeUrl = targetUrl.replace(/\/view.*$/, '/preview');
-                        if (!iframeUrl.endsWith('/preview')) {
-                            // If it didn't have /view to replace, just append it safely
-                            iframeUrl = iframeUrl.split('?')[0] + '/preview';
-                        }
-                    } else if (isPdf) {
-                        // For generic raw .pdf links, force them through Google's free PDF viewer
-                        iframeUrl = `https://docs.google.com/gview?url=${encodeURIComponent(targetUrl)}&embedded=true`;
-                    }
-
-                    // Render the PDF viewer inside our container
-                    container.innerHTML = `<iframe src="${iframeUrl}" width="100%" height="800px" style="border: none; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"></iframe>`;
-                    
-                    // Add the PDF to our history path
-                    let titleText = clickedText ? clickedText : "PDF Document";
-                    if (historyIndex === -1) {
-                        pageHistory.push({ url: targetUrl, title: titleText });
-                    } else {
-                        pageHistory = pageHistory.slice(0, historyIndex + 1);
-                    }
-                    renderBreadcrumbs();
-                    return; // EXIT EARLY: Do not run the rest of the web scraper!
-                }
-                // ------------------------------------------
-
-                // If it's a normal page, proceed with fetching and cleaning
-                const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
-                const response = await fetch(proxyUrl);
-                
-                if (!response.ok) throw new Error(`Proxy blocked. Status: ${response.status}`);
-                
-                const rawHtml = await response.text();
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(rawHtml, 'text/html');
-
-                const elementsToRemove = [
-                    'header', 'footer', 'nav', 'aside', 'iframe', 'script', 'style', 
-                    'link', '.sidebar', '.widget-area', '.comments-area', '#comments',
-                    '.ez-toc-container', '.adsbygoogle', '.ast-header-breadcrumb'
-                ];
-                
-                elementsToRemove.forEach(selector => {
-                    doc.querySelectorAll(selector).forEach(el => el.remove());
-                });
-
-                let mainContent = doc.querySelector('.entry-content') || 
-                                  doc.querySelector('article') || doc.body;
-
-                const links = mainContent.querySelectorAll('a');
-                links.forEach(link => {
-                    let href = link.getAttribute('href');
-                    if (href) {
-                        if (href.startsWith('#') || href.startsWith('javascript:')) return; 
-
-                        const absoluteUrl = new URL(href, targetUrl).href;
-                        link.href = absoluteUrl; 
-                        link.onclick = (e) => {
-                            if (absoluteUrl.startsWith('http')) {
-                                e.preventDefault();
-                                
-                                let linkText = link.textContent.trim();
-                                if (!linkText) linkText = "Next Page"; 
-                                
-                                loadPage(absoluteUrl, -1, linkText);
-                            }
-                        };
-                    }
-                });
-
-                const images = mainContent.querySelectorAll('img');
-                images.forEach(img => {
-                    let src = img.getAttribute('src');
-                    if (src) img.src = new URL(src, targetUrl).href;
-                    img.removeAttribute('srcset'); 
-                });
-
-                let titleText = "Page";
-                if (clickedText) {
-                    titleText = clickedText;
-                } else {
-                    const pageTitleNode = doc.querySelector('.entry-title');
-                    if (pageTitleNode) titleText = pageTitleNode.textContent.trim();
-                }
-
-                if (historyIndex === -1) {
-                    pageHistory.push({ url: targetUrl, title: titleText });
-                } else {
-                    pageHistory = pageHistory.slice(0, historyIndex + 1);
-                }
-                
-                renderBreadcrumbs();
-
-                loader.style.display = 'none';
-                toolbarDiv.style.display = 'none'; 
-                
-                const pageTitleNode = doc.querySelector('.entry-title');
-                if (pageTitleNode) container.appendChild(pageTitleNode);
-                
-                container.appendChild(mainContent);
-
-                if (window.MathJax) {
-                    MathJax.typesetPromise([container]).catch(err => console.error('Math error:', err));
-                }
-
-            } catch (error) {
-                console.error(error);
-                loader.style.display = 'none';
-                toolbarDiv.style.display = 'none';
-                container.innerHTML = `<h2 style="color: #e74c3c;">Failed to load page</h2><p>${error.message}</p>`;
-            }
-        }
-
-        function renderBreadcrumbs() {
-            breadcrumbsDiv.innerHTML = '';
+            container.innerHTML = `<iframe src="${iframeUrl}" width="100%" height="800px" style="border: none; border-radius: 8px;"></iframe>`;
             
-            if (pageHistory.length === 0) {
-                breadcrumbsDiv.style.display = 'none';
-                return;
-            }
-
-            breadcrumbsDiv.style.display = 'flex';
-
-            pageHistory.forEach((page, index) => {
-                const link = document.createElement('a');
-                link.href = '#';
-                
-                link.textContent = page.title.length > 30 ? page.title.substring(0, 30) + '...' : page.title;
-                
-                link.onclick = (e) => {
-                    e.preventDefault();
-                    if (index === pageHistory.length - 1) return; 
-                    
-                    loadPage(page.url, index, page.title);
-                };
-                
-                breadcrumbsDiv.appendChild(link);
-
-                if (index < pageHistory.length - 1) {
-                    const separator = document.createElement('span');
-                    separator.className = 'separator';
-                    separator.textContent = '❯';
-                    breadcrumbsDiv.appendChild(separator);
-                }
-            });
+            let titleText = clickedText ? clickedText : "PDF Document";
+            if (historyIndex === -1) pageHistory.push({ url: targetUrl, title: titleText });
+            else pageHistory = pageHistory.slice(0, historyIndex + 1);
+            renderBreadcrumbs();
+            return; 
         }
-    </script>
+
+        // Normal proxy fetch
+        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+        const response = await fetch(proxyUrl);
+        if (!response.ok) throw new Error(`Proxy blocked. Status: ${response.status}`);
+        
+        const rawHtml = await response.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(rawHtml, 'text/html');
+
+        const elementsToRemove = [
+            'header', 'footer', 'nav', 'aside', 'iframe', 'script', 'style', 
+            'link', '.sidebar', '.widget-area', '.comments-area', '#comments',
+            '.ez-toc-container', '.adsbygoogle', '.ast-header-breadcrumb'
+        ];
+        elementsToRemove.forEach(selector => doc.querySelectorAll(selector).forEach(el => el.remove()));
+
+        let mainContent = doc.querySelector('.entry-content') || doc.querySelector('article') || doc.body;
+
+        const links = mainContent.querySelectorAll('a');
+        links.forEach(link => {
+            let href = link.getAttribute('href');
+            if (href) {
+                if (href.startsWith('#') || href.startsWith('javascript:')) return; 
+                const absoluteUrl = new URL(href, targetUrl).href;
+                link.href = absoluteUrl; 
+                link.onclick = (e) => {
+                    if (absoluteUrl.startsWith('http')) {
+                        e.preventDefault();
+                        let linkText = link.textContent.trim();
+                        if (!linkText) linkText = "Next Page"; 
+                        loadPage(absoluteUrl, -1, linkText);
+                    }
+                };
+            }
+        });
+
+        const images = mainContent.querySelectorAll('img');
+        images.forEach(img => {
+            let src = img.getAttribute('src');
+            if (src) img.src = new URL(src, targetUrl).href;
+            img.removeAttribute('srcset'); 
+        });
+
+        let titleText = "Page";
+        if (clickedText) {
+            titleText = clickedText;
+        } else {
+            const pageTitleNode = doc.querySelector('.entry-title');
+            if (pageTitleNode) titleText = pageTitleNode.textContent.trim();
+        }
+
+        if (historyIndex === -1) {
+            pageHistory.push({ url: targetUrl, title: titleText });
+        } else {
+            pageHistory = pageHistory.slice(0, historyIndex + 1);
+        }
+        
+        renderBreadcrumbs();
+
+        loader.style.display = 'none';
+        
+        const pageTitleNode = doc.querySelector('.entry-title');
+        if (pageTitleNode) container.appendChild(pageTitleNode);
+        container.appendChild(mainContent);
+
+        if (window.MathJax) {
+            MathJax.typesetPromise([container]).catch(err => console.error('Math error:', err));
+        }
+
+    } catch (error) {
+        console.error(error);
+        loader.style.display = 'none';
+        container.innerHTML = `<h2 style="color: #e74c3c;">Failed to load page</h2><p>${error.message}</p>`;
+    }
+}
+
+function renderBreadcrumbs() {
+    breadcrumbsDiv.innerHTML = '';
+    
+    if (pageHistory.length === 0) {
+        breadcrumbsDiv.style.display = 'none';
+        return;
+    }
+
+    breadcrumbsDiv.style.display = 'flex';
+
+    pageHistory.forEach((page, index) => {
+        const link = document.createElement('a');
+        link.href = '#';
+        link.textContent = page.title.length > 30 ? page.title.substring(0, 30) + '...' : page.title;
+        
+        link.onclick = (e) => {
+            e.preventDefault();
+            if (index === pageHistory.length - 1) return; 
+            loadPage(page.url, index, page.title);
+        };
+        
+        breadcrumbsDiv.appendChild(link);
+
+        if (index < pageHistory.length - 1) {
+            const separator = document.createElement('span');
+            separator.className = 'separator';
+            separator.textContent = '❯';
+            breadcrumbsDiv.appendChild(separator);
+        }
+    });
+}
+
+// Initialize StudyHub on load
+window.onload = render;
+
+</script>
 </body>
 </html>
