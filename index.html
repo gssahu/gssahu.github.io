@@ -319,7 +319,9 @@ const EXTRA_RESOURCES = [
   {name:"Unseen Passages", icon:"🔎", url:"unseen-passage/", cat:"extra"},
   {name:"MCQ Questions", icon:"❓", url:"mcq-questions/", cat:"extra"},
   {name:"Extra Questions", icon:"➕", url:"extra-questions/", cat:"extra"},
-  {name:"CUET Exam", icon:"🎓", url:"cuet-exam/", cat:"extra"}
+  {name:"CUET Exam", icon:"🎓", url:"cuet-exam/", cat:"extra"},
+  {name:"CBSE LEARN", icon:"🎓", url:"https://www.learncbse.in", cat:"extra"}
+
 ];
 
 function loadSet(key){ try{ return new Set(JSON.parse(localStorage.getItem(key)||"[]")); }catch(e){ return new Set(); } }
@@ -380,7 +382,7 @@ function setCategory(cat){
 
 // MODIFIED: Injects link into the proxy reader instead of navigating away
 function linkHTML(r, label){
-  const absoluteUrl = BASE + r.url;
+  const absoluteUrl = r.url.startsWith('http') ? r.url : BASE + r.url;
   const isFav = favorites.has(r.url);
   const isVisited = visited.has(r.url);
   return `<li><a href="${absoluteUrl}" onclick="event.preventDefault(); openProxyFromHome('${absoluteUrl}', '${label}', '${r.url}')">
