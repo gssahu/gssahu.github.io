@@ -213,13 +213,14 @@ function subjectsForClass(cls){
   const recs = scrapedForClass(cls);
   const map = {};
   recs.forEach(r=>{
-    if(!map[r.subject]) map[r.subject] = 0;
-    map[r.subject]++;
+    const name = r.subject || "General";
+    if(!map[name]) map[name] = 0;
+    map[name]++;
   });
   return Object.keys(map).sort().map(name => ({ name, count: map[name] }));
 }
 function typesForSubject(cls, subject){
-  const recs = scrapedForClass(cls).filter(r => r.subject === subject);
+  const recs = scrapedForClass(cls).filter(r => (r.subject || "General") === subject);
   const map = {};
   recs.forEach(r=>{
     if(!map[r.type]) map[r.type] = 0;
@@ -229,7 +230,7 @@ function typesForSubject(cls, subject){
 }
 function resourcesForType(cls, subject, type){
   return scrapedForClass(cls)
-    .filter(r => r.subject === subject && r.type === type)
+    .filter(r => (r.subject || "General") === subject && r.type === type)
     .sort((a,b) => (a.chapter_num||0) - (b.chapter_num||0));
 }
 const TYPE_LABELS = {
@@ -239,6 +240,45 @@ const TYPE_LABELS = {
   sample_paper: "📝 Sample Papers", worksheet: "🧾 Worksheets", notes: "🗒️ Notes", other: "🔗 Other Links"
 };
 function typeLabel(t){ return TYPE_LABELS[t] || ("🔗 " + t); }
+const NCERT_OFFICIAL_URL = "https://raw.githubusercontent.com/gssahu/studyhub-content/main/index/ncert_official.json";
+let OFFICIAL = {};          // { "10": { subjects: [...], books: { Subject: [{title,code,start,end}] } } }
+let officialLoaded = false;
+let officialLoadError = null;
+
+async function loadOfficialIndex(){
+  try{
+    const res = await fetch(NCERT_OFFICIAL_URL, { cache: "no-store" });
+    if(!res.ok) throw new Error("HTTP " + res.status);
+    OFFICIAL = await res.json();
+    officialLoaded = true;
+  }catch(e){
+    console.error("Failed to load NCERT official index:", e);
+    officialLoadError = e.message || "Unknown error";
+  }
+  render();
+}
+
+// Generates chapter-wise PDF links for one book, entirely client-side -
+// no network request needed, based on NCERT's own predictable filename
+// pattern: {bookcode}{chapterNum, 2-digit padded}.pdf
+function generateChapterLinks(book){
+  const links = [];
+  for(let n = book.start; n <= book.end; n++){
+    const padded = String(n).padStart(2, "0");
+    links.push({
+      chapter_num: n,
+      title: n === 0 ? "Front Matter / Preface" : `Chapter ${n}`,
+      pdf_url: `https://ncert.nic.in/textbook/pdf/${book.code}${padded}.pdf`,
+      book_page_url: `https://ncert.nic.in/textbook.php?${book.code}=${book.start}-${book.end}`
+    });
+  }
+  return links;
+}
+
+function officialBooksForClass(cls){
+  const entry = OFFICIAL[String(cls)];
+  return entry ? entry : { subjects: [], books: {} };
+}
 
 const DATA = {
   1: { label:"Class 1", subjects:[
@@ -375,16 +415,16 @@ const EXTRA_RESOURCES = [
   {name:"MCQ Questions", icon:"❓", url:"mcq-questions/", cat:"extra"},
   {name:"Extra Questions", icon:"➕", url:"extra-questions/", cat:"extra"},
   {name:"CUET Exam", icon:"🎓", url:"cuet-exam/", cat:"extra"},
-  {name:"CBSE LEARN", icon:"🎓", url:"https://www.learncbse.in", cat:"extra"},
-  {name:"Chhattisgarh Board LEARN", icon:"📘", url:"https://cgbsesolutions.com/", cat:"extra"},
-//  {name:"CG Text Book 2024-25 (English Medium)", icon:"📘", url:"https://scert.cg.gov.in/pdf/textbook-EM-2024-25/textbook-em-2024-25.htm", cat:"extra"},
-//  {name:"CG Text Book 2024-25 (Hindi Medium)", icon:"📘", url:"https://scert.cg.gov.in/pdf/textbook-2024-25/textbook-2024-25.htm", cat:"extra"},
-  {name:"CG Text Book Chapterwise(Hindi Medium)", icon:"📘", url:"https://www.evidyarthi.in/chhattisgarh-board/chhattisgarh-board-books/", cat:"extra"}
+  {name:"CBSE LEARN", icon:"🎓", url:"https://www.learncbse.in", cat:"extra"}
+];
 
-
-
-
-
+// Chhattisgarh Board (CGBSE) - separate section, distinct from the generic
+// CBSE-focused EXTRA_RESOURCES above.
+const CGBOARD_RESOURCES = [
+  {name:"Chhattisgarh Board LEARN", icon:"📘", url:"https://cgbsesolutions.com/", cat:"cgboard"},
+  {name:"CG Text Book 2024-25 (English Medium)", icon:"📘", url:"https://scert.cg.gov.in/pdf/textbook-EM-2024-25/textbook-em-2024-25.htm", cat:"cgboard"},
+  {name:"CG Text Book 2024-25 (Hindi Medium)", icon:"📘", url:"https://scert.cg.gov.in/pdf/textbook-2024-25/textbook-2024-25.htm", cat:"cgboard"},
+  {name:"CG Text Book Chapterwise (Hindi Medium)", icon:"📘", url:"https://www.evidyarthi.in/chhattisgarh-board/chhattisgarh-board-books/", cat:"cgboard"}
 ];
 
 function loadSet(key){ try{ return new Set(JSON.parse(localStorage.getItem(key)||"[]")); }catch(e){ return new Set(); } }
@@ -395,13 +435,14 @@ let visited = loadSet("studyhub_visited");
 let theme = localStorage.getItem("studyhub_theme") || "dark";
 document.documentElement.setAttribute("data-theme", theme);
 
-let state = { view:"home", cls:null, subject:null, type:null, category:"all", favOnly:false };
+let state = { view:"home", cls:null, subject:null, type:null, officialBookIndex:null, category:"all", favOnly:false };
 let pageHistory = []; // Tracks proxy path
 
 function allLinks(){
   let out = [];
   Object.keys(DATA).forEach(c=>{ DATA[c].subjects.forEach(s=> out.push({cls:c, ...s})); });
   EXTRA_RESOURCES.forEach(r=> out.push({cls:null, ...r}));
+  CGBOARD_RESOURCES.forEach(r=> out.push({cls:null, ...r}));
   return out;
 }
 
@@ -503,6 +544,10 @@ function render(){
         html += `<div class="section-title" style="margin-top:36px">More Resources <span class="pill">Extra</span></div><ul class="linklist">`;
         EXTRA_RESOURCES.forEach(r=> html += linkHTML({cls:null,...r}, r.name));
         html += `</ul>`;
+
+        html += `<div class="section-title" style="margin-top:36px">🟢 Chhattisgarh Board (CGBSE) <span class="pill">${CGBOARD_RESOURCES.length}</span></div><ul class="linklist">`;
+        CGBOARD_RESOURCES.forEach(r=> html += linkHTML({cls:null,...r}, r.name));
+        html += `</ul>`;
       }
     }
     content.innerHTML = html;
@@ -539,6 +584,79 @@ function render(){
         });
         html += `</div>`;
       }
+    }
+    // --- NCERT Official (ncert.nic.in) section ---
+    const off = officialBooksForClass(state.cls);
+    html += `<div class="section-title" style="margin-top:36px">🇮🇳 NCERT Official Books <span class="pill">${officialLoaded ? off.subjects.length : '…'}</span></div>`;
+    if(!officialLoaded && !officialLoadError){
+      html += `<div class="empty">Loading official NCERT index...</div>`;
+    } else if(officialLoadError){
+      html += `<div class="empty">Couldn't load official index (${officialLoadError}). Retry: <a href="#" onclick="event.preventDefault(); loadOfficialIndex();" style="color:var(--accent);">reload</a></div>`;
+    } else if(off.subjects.length === 0){
+      html += `<div class="empty">No official NCERT data for this class yet.</div>`;
+    } else {
+      html += `<div class="grid">`;
+      off.subjects.forEach(s=>{
+        const bookCount = (off.books[s] || []).length;
+        html += `<div class="card" onclick="selectOfficialSubject('${s.replace(/'/g,"\\'")}')">
+          <div class="big" style="font-size:1.1rem">${s}</div>
+          <div class="lbl">${bookCount} book${bookCount===1?'':'s'}</div></div>`;
+      });
+      html += `</div>`;
+    }
+
+    content.innerHTML = html;
+  } else if(state.view === "osubject"){
+    const off = officialBooksForClass(state.cls);
+    const books = off.books[state.subject] || [];
+    let html = `<div class="section-title">
+      <span onclick="goHome()" style="cursor:pointer; color:var(--accent);">Classes</span>
+      <span style="color:var(--muted); margin:0 5px;">›</span>
+      <span onclick="selectClass(${state.cls})" style="cursor:pointer; color:var(--accent);">Class ${state.cls}</span>
+      <span style="color:var(--muted); margin:0 5px;">›</span> ${state.subject} (Official) <span class="pill">${books.length}</span>
+    </div>`;
+    if(books.length === 0) html += `<div class="empty">No books found.</div>`;
+    else {
+      html += `<div class="grid">`;
+      books.forEach((b,i)=>{
+        const chCount = b.end - b.start + 1;
+        html += `<div class="card" onclick="selectOfficialBook(${i})">
+          <div class="big" style="font-size:1.05rem">${b.title}</div>
+          <div class="lbl">${chCount} chapters</div></div>`;
+      });
+      html += `</div>`;
+    }
+    content.innerHTML = html;
+  } else if(state.view === "obook"){
+    const off = officialBooksForClass(state.cls);
+    const books = off.books[state.subject] || [];
+    const book = books[state.officialBookIndex];
+    let html = `<div class="section-title">
+      <span onclick="goHome()" style="cursor:pointer; color:var(--accent);">Classes</span>
+      <span style="color:var(--muted); margin:0 5px;">›</span>
+      <span onclick="selectClass(${state.cls})" style="cursor:pointer; color:var(--accent);">Class ${state.cls}</span>
+      <span style="color:var(--muted); margin:0 5px;">›</span>
+      <span onclick="selectOfficialSubject('${state.subject.replace(/'/g,"\\'")}')" style="cursor:pointer; color:var(--accent);">${state.subject}</span>
+      <span style="color:var(--muted); margin:0 5px;">›</span> ${book ? book.title : ''}
+    </div>`;
+    if(!book) html += `<div class="empty">Book not found.</div>`;
+    else {
+      const chapters = generateChapterLinks(book);
+      html += `<ul class="linklist">`;
+      chapters.forEach(ch=>{
+        const key = ch.pdf_url;
+        const isFav = favorites.has(key);
+        const isVisited = visited.has(key);
+        const safeLabel = ch.title.replace(/'/g, "\\'");
+        html += `<li><a href="${ch.pdf_url}" onclick="event.preventDefault(); openProxyFromHome('${ch.pdf_url}', '${safeLabel}', '${key}')">
+            <span class="left">📄 ${ch.title}${isVisited?'<span class="visited-badge">visited</span>':''}</span>
+            <span style="display:flex; align-items:center; gap:10px;">
+              <button class="starbtn ${isFav?'on':''}" onclick="toggleFav('${key}', event)">★</button>
+              <span class="arrow">↗</span>
+            </span>
+          </a></li>`;
+      });
+      html += `</ul>`;
     }
     content.innerHTML = html;
   } else if(state.view === "subject"){
@@ -580,14 +698,27 @@ function render(){
   }
 }
 
-function selectSubject(subject){
-  state.view = "subject"; state.subject = subject; state.type = null;
-  state.favOnly = false; document.getElementById("favBtn").classList.remove("active");
+function selectOfficialSubject(subject){
+  state.view = "osubject"; state.subject = subject; state.officialBookIndex = null;
   render();
 }
-function selectType(type){
-  state.view = "type"; state.type = type;
+function selectOfficialBook(index){
+  state.view = "obook"; state.officialBookIndex = index;
   render();
+}
+
+function selectSubject(subject){
+  try{
+    state.view = "subject"; state.subject = subject; state.type = null;
+    state.favOnly = false; document.getElementById("favBtn").classList.remove("active");
+    render();
+  }catch(e){ console.error("selectSubject failed:", e); }
+}
+function selectType(type){
+  try{
+    state.view = "type"; state.type = type;
+    render();
+  }catch(e){ console.error("selectType failed:", e); }
 }
 
 // Renders one scraped chapter/resource link using the same visual style
@@ -610,7 +741,7 @@ function scrapedLinkHTML(r){
     </a></li>`;
 }
 
-function selectClass(c){ state.view="class"; state.cls=Number(c); state.subject=null; state.type=null; state.favOnly=false; document.getElementById("favBtn").classList.remove("active"); render(); }
+function selectClass(c){ state.view="class"; state.cls=Number(c); state.subject=null; state.type=null; state.officialBookIndex=null; state.favOnly=false; document.getElementById("favBtn").classList.remove("active"); render(); }
 
 document.getElementById("searchBox").addEventListener("input", (e)=>{
   const q = e.target.value.trim().toLowerCase();
@@ -651,6 +782,7 @@ function goHome(){
   state.cls=null; 
   state.subject=null;
   state.type=null;
+  state.officialBookIndex=null;
   state.favOnly=false; 
   document.getElementById("favBtn").classList.remove("active"); 
   document.getElementById("searchBox").value=""; 
@@ -666,6 +798,8 @@ function breadcrumbLabelFor(s){
   if(s.view === "class") return `Class ${s.cls}`;
   if(s.view === "subject") return `${s.subject}`;
   if(s.view === "type") return `${typeLabel(s.type)}`;
+  if(s.view === "osubject") return `${s.subject} (Official)`;
+  if(s.view === "obook") return `Official Book`;
   return "🏠 Home";
 }
 
@@ -678,6 +812,7 @@ function returnToApp(){
     state.cls = preReaderState.cls;
     state.subject = preReaderState.subject;
     state.type = preReaderState.type;
+    state.officialBookIndex = preReaderState.officialBookIndex;
   }
   pageHistory = [];
   render();
@@ -685,7 +820,7 @@ function returnToApp(){
 
 function openProxyFromHome(absoluteUrl, label, rawUrl) {
     markVisited(rawUrl);
-    preReaderState = { view: state.view, cls: state.cls, subject: state.subject, type: state.type };
+    preReaderState = { view: state.view, cls: state.cls, subject: state.subject, type: state.type, officialBookIndex: state.officialBookIndex };
     pageHistory = [];
     // First breadcrumb returns to wherever the user actually came from
     // (Home grid, or Class > Subject > Type list) instead of always Home.
@@ -717,9 +852,72 @@ async function loadPage(targetUrl, historyIndex = -1, clickedText = null) {
                 // --- NEW: PDF AND GOOGLE DRIVE DETECTOR ---
                 const isGoogleDrive = targetUrl.includes('drive.google.com/file/d/');
                 const isPdf = targetUrl.toLowerCase().split('?')[0].endsWith('.pdf'); // Ignore URL parameters
-                const isSelfstudys = targetUrl.includes('selfstudys.com/books/');
+                // Some government-hosted PDFs (e.g. .gov.in) can't be fetched by
+                // Google's viewer at all - retrying never helps there. Render
+                // these natively in the browser's own PDF engine instead.
+                const isGovPdf = isPdf && /\.gov\.in\//i.test(targetUrl);
 
-                if (isGoogleDrive || isPdf || isSelfstudys) {
+                if (isGovPdf) {
+                    // These sites block iframe embedding entirely via their own
+                    // security headers (X-Frame-Options / CSP) - this applies to
+                    // ANY embedding attempt, not just Google's viewer, so there
+                    // is no client-side workaround. Auto-open in a new tab instead.
+                    loader.style.display = 'none';
+                    toolbarDiv.style.display = 'flex';
+                    container.innerHTML = `
+                        <div style="text-align:center; padding:60px 20px;">
+                            <div style="font-size:3rem; margin-bottom:16px;">🔒</div>
+                            <div style="font-size:1.1rem; margin-bottom:8px;">This government site doesn't allow PDFs to be shown inside other apps.</div>
+                            <div style="color:var(--muted); margin-bottom:24px;">It should have opened in a new tab automatically. If not, tap below.</div>
+                            <a class="secondary" href="${targetUrl}" target="_blank" rel="noopener" style="text-decoration:none; display:inline-flex; align-items:center; padding:12px 24px; border-radius:8px; font-size:1rem;">
+                                ↗ Open PDF in New Tab
+                            </a>
+                        </div>`;
+                    // Auto-open once so the user doesn't have to click at all
+                    window.open(targetUrl, '_blank', 'noopener');
+
+                    let titleText = clickedText ? clickedText : "PDF Document";
+                    if (historyIndex === -1) {
+                        pageHistory.push({ url: targetUrl, title: titleText });
+                    } else {
+                        pageHistory = pageHistory.slice(0, historyIndex + 1);
+                    }
+                    renderBreadcrumbs();
+                    return; // EXIT EARLY: skip the iframe-embedding logic below
+                }
+
+                // Vedantu's Revision Notes render as a JS-driven multi-page
+                // image viewer where only page 1 exists in the static HTML -
+                // the rest load only when the user clicks "next" on the live
+                // site. Detect purely from the URL (reliable) rather than
+                // scraped DOM classes (fragile, can vary by fetch/build).
+                const isVedantuPaginatedViewer = /vedantu\.com/i.test(targetUrl) && /\/revision-notes\//i.test(targetUrl);
+
+                if (isVedantuPaginatedViewer) {
+                    loader.style.display = 'none';
+                    toolbarDiv.style.display = 'flex';
+                    container.innerHTML = `
+                        <div style="text-align:center; padding:60px 20px;">
+                            <div style="font-size:3rem; margin-bottom:16px;">📖</div>
+                            <div style="font-size:1.1rem; margin-bottom:8px;">This page uses a multi-page viewer that only loads one page at a time here.</div>
+                            <div style="color:var(--muted); margin-bottom:24px;">It should have opened in a new tab automatically. If not, tap below.</div>
+                            <a class="secondary" href="${targetUrl}" target="_blank" rel="noopener" style="text-decoration:none; display:inline-flex; align-items:center; padding:12px 24px; border-radius:8px; font-size:1rem;">
+                                ↗ Open Full Document in New Tab
+                            </a>
+                        </div>`;
+                    window.open(targetUrl, '_blank', 'noopener');
+
+                    let fallbackTitle = clickedText ? clickedText : "Document";
+                    if (historyIndex === -1) {
+                        pageHistory.push({ url: targetUrl, title: fallbackTitle });
+                    } else {
+                        pageHistory = pageHistory.slice(0, historyIndex + 1);
+                    }
+                    renderBreadcrumbs();
+                    return; // EXIT EARLY: skip fetch/scraping entirely
+                }
+
+                if (isGoogleDrive || isPdf) {
                     loader.style.display = 'none';
                     toolbarDiv.style.display = 'flex';
                     
@@ -732,19 +930,36 @@ async function loadPage(targetUrl, historyIndex = -1, clickedText = null) {
                             // If it didn't have /view to replace, just append it safely
                             iframeUrl = iframeUrl.split('?')[0] + '/preview';
                         }
-                    } else if (isSelfstudys) {
-                        // selfstudys.com renders solutions via Adobe's PDF embed viewer,
-                        // which lives at a different path than the page you click through to:
-                        //   .../books/ncert-solution/...  ->  .../advance-pdf-viewer/ncert-solution/...
-                        iframeUrl = targetUrl.replace('selfstudys.com/books/', 'selfstudys.com/advance-pdf-viewer/');
                     } else if (isPdf) {
                         // For generic raw .pdf links, force them through Google's free PDF viewer
-			 iframeUrl = `https://docs.google.com/gview?url=${encodeURIComponent(targetUrl)}&embedded=true`;
+			 iframeUrl = `https://docs.google.com/viewerng/viewer?url=${encodeURIComponent(targetUrl)}&embedded=true`;
 
                     }
 
-                    // Render the PDF viewer inside our container
-                    container.innerHTML = `<iframe src="${iframeUrl}" width="100%" height="800px" allowfullscreen="true" allow="fullscreen" webkitallowfullscreen="true" mozallowfullscreen="true" style="border: none; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"></iframe>`;
+                    // Render the PDF viewer inside our container, plus a retry
+                    // button and an "open original" fallback - Google's viewer
+                    // sometimes needs a second attempt for an uncached PDF, and
+                    // some government-hosted PDFs are firewalled from Google's
+                    // fetcher entirely, in which case retrying never helps and
+                    // opening the source file directly is the only way through.
+                    container.innerHTML = `
+                        <iframe id="pdfFrame" src="${iframeUrl}" width="100%" height="800px" allowfullscreen="true" allow="fullscreen" webkitallowfullscreen="true" mozallowfullscreen="true" style="border: none; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"></iframe>
+                        <div style="text-align:center; margin-top:8px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+                            <button class="secondary" onclick="document.getElementById('pdfFrame').src = document.getElementById('pdfFrame').src">
+                                🔄 PDF not showing? Tap to retry
+                            </button>
+                            <a class="secondary" href="${targetUrl}" target="_blank" rel="noopener" style="text-decoration:none; display:inline-flex; align-items:center; padding:8px 14px; border-radius:8px;">
+                                ↗ Still blank? Open original PDF
+                            </a>
+                        </div>`;
+
+                    // One automatic silent retry after 3.5s - covers the common
+                    // case where the first load was blank because Google's
+                    // viewer was still fetching/converting the source PDF.
+                    setTimeout(() => {
+                        const f = document.getElementById('pdfFrame');
+                        if (f) f.src = f.src;
+                    }, 3500);
                     
                     // Add the PDF to our history path
                     let titleText = clickedText ? clickedText : "PDF Document";
@@ -772,11 +987,25 @@ async function loadPage(targetUrl, historyIndex = -1, clickedText = null) {
         const elementsToRemove = [
             'header', 'footer', 'nav', 'aside', 'iframe', 'script', 'style', 
             'link', '.sidebar', '.widget-area', '.comments-area', '#comments',
-            '.ez-toc-container', '.adsbygoogle', '.ast-header-breadcrumb'
+            '.ez-toc-container', '.adsbygoogle', '.ast-header-breadcrumb',
+            'a[href^="tel:"]', 'a[href^="mailto:"]'
         ];
         elementsToRemove.forEach(selector => doc.querySelectorAll(selector).forEach(el => el.remove()));
 
         let mainContent = doc.querySelector('.entry-content') || doc.querySelector('article') || doc.body;
+
+        // Some sites (e.g. Vedantu) leave nav-chrome elements like phone
+        // numbers and dropdown arrow icons outside <nav>/<header>, so the
+        // generic removal above misses them. Strip anything matching common
+        // icon/UI-chrome filename patterns before they get treated as real
+        // content images.
+        const ICON_SRC_PATTERNS = /arrow|dropdown|toc-symbol|chevron|caret|hamburger|menu-icon|navbar/i;
+        mainContent.querySelectorAll('img').forEach(img => {
+            const src = img.getAttribute('src') || img.getAttribute('data-src') || '';
+            if (ICON_SRC_PATTERNS.test(src)) img.remove();
+        });
+        // Catch any remaining tel:/mailto: links that were inside mainContent itself
+        mainContent.querySelectorAll('a[href^="tel:"], a[href^="mailto:"]').forEach(el => el.remove());
 
         const links = mainContent.querySelectorAll('a');
         links.forEach(link => {
@@ -814,6 +1043,13 @@ async function loadPage(targetUrl, historyIndex = -1, clickedText = null) {
             img.removeAttribute('srcset'); 
             img.removeAttribute('loading');
             img.removeAttribute('data-src');
+
+            // 3. Cap size so icons/images that lose their site's CSS never
+            // render at their raw native (sometimes huge) size.
+            img.style.maxWidth = '100%';
+            img.style.maxHeight = '400px';
+            img.style.height = 'auto';
+            img.style.width = 'auto';
             img.removeAttribute('data-lazy-src');
             img.removeAttribute('data-opt-src');
             
@@ -890,7 +1126,7 @@ function renderBreadcrumbs() {
 }
 
 // Initialize StudyHub on load
-window.onload = function(){ render(); loadScrapedIndex(); };
+window.onload = function(){ render(); loadScrapedIndex(); loadOfficialIndex(); };
 
 </script>
 </body>
