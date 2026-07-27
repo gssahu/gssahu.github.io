@@ -394,7 +394,6 @@ const DATA = {
       {name:"English", icon:"🔤", url:"ncert-solutions-for-class-11-english/", cat:"ncert"},
       {name:"RD Sharma Maths", icon:"📐", url:"rd-sharma-class-11-solutions/", cat:"rd"},
       {name:"TS GREWAL ACCOUNTS", icon:"📐", url:"https://ncertsolutions.guru/ts-grewal-accountancy-class-11-solutions/", cat:"ts"}
-
   ]},
   12: { label:"Class 12", subjects:[
       {name:"Overview", icon:"📘", url:"ncert-solutions-for-class-12/", cat:"ncert"},
@@ -405,7 +404,6 @@ const DATA = {
       {name:"English", icon:"🔤", url:"ncert-solutions-for-class-12-english/", cat:"ncert"},
       {name:"RD Sharma Maths", icon:"📐", url:"rd-sharma-class-12-solutions/", cat:"rd"},
       {name:"TS GREWAL ACCOUNTS", icon:"📐", url:"https://ncertsolutions.guru/ts-grewal-accountancy-class-12-solutions/", cat:"ts"}
-
   ]}
 };
 
@@ -421,7 +419,6 @@ const EXTRA_RESOURCES = [
   {name:"CUET Exam", icon:"🎓", url:"cuet-exam/", cat:"extra"},
   {name:"CBSE LEARN", icon:"📝", url:"https://www.learncbse.in", cat:"extra"},
   {name:"Solution Guru", icon:"📝", url:"https://ncertsolutions.guru/", cat:"extra"}
-
 ];
 
 // Chhattisgarh Board (CGBSE) - separate section, distinct from the generic
@@ -1032,19 +1029,60 @@ async function loadPage(targetUrl, historyIndex = -1, clickedText = null) {
         });
 
         // --- NEW: LAZY LOAD IMAGE FIX ---
+        // <picture> elements with a <source> child take priority over the
+        // <img>'s own src in the browser's eyes - so even after fixing the
+        // <img> src above, a stale placeholder srcset on <source> would
+        // still win. Strip these out entirely; the browser falls back to
+        // the (now-correct) <img src> once no <source> matches.
+        mainContent.querySelectorAll('picture source').forEach(source => {
+            const srcset = source.getAttribute('srcset') || '';
+            if (srcset.trim().startsWith('data:image/svg+xml') || !srcset.trim()) {
+                source.remove();
+            } else {
+                // Has a real srcset already - still worth trying the
+                // data-lazy-srcset in case the visible one is stale too.
+                const lazySrcset = source.getAttribute('data-lazy-srcset');
+                if (lazySrcset) source.setAttribute('srcset', lazySrcset);
+            }
+        });
+
         const images = mainContent.querySelectorAll('img');
         images.forEach(img => {
-            // 1. Look for hidden lazy-load URLs first, then fall back to standard 'src'
-            let realSrc = img.getAttribute('data-src') || 
-                          img.getAttribute('data-lazy-src') || 
-                          img.getAttribute('data-opt-src') || 
+            // 1. Look for hidden lazy-load URLs first, checking every common
+            // attribute name different lazy-load plugins use, then fall back
+            // to standard 'src' - but treat a blank/placeholder SVG data URI
+            // as "not found" rather than using it.
+            let realSrc = img.getAttribute('data-src') ||
+                          img.getAttribute('data-lazy-src') ||
+                          img.getAttribute('data-opt-src') ||
+                          img.getAttribute('data-lazy-original') ||
+                          img.getAttribute('data-original') ||
+                          img.getAttribute('data-orig-file') ||
+                          img.getAttribute('data-large-file') ||
                           img.getAttribute('src');
-            
-            if (realSrc) {
+
+            const isPlaceholder = !realSrc || realSrc.trim().startsWith('data:image/svg+xml');
+
+            if (isPlaceholder) {
+                // Common WordPress lazy-load pattern: the real <img> is
+                // duplicated inside a sibling <noscript> tag as a fallback
+                // for when JS doesn't run - which is exactly our situation.
+                const noscript = img.nextElementSibling;
+                if (noscript && noscript.tagName === 'NOSCRIPT') {
+                    const temp = document.createElement('div');
+                    temp.innerHTML = noscript.textContent || noscript.innerHTML;
+                    const realImg = temp.querySelector('img');
+                    if (realImg) {
+                        realSrc = realImg.getAttribute('src');
+                    }
+                }
+            }
+
+            if (realSrc && !realSrc.trim().startsWith('data:image/svg+xml')) {
                 // Ensure the URL is absolute
                 img.src = new URL(realSrc, targetUrl).href;
             }
-            
+
             // 2. Strip away the lazy-loading attributes so the browser doesn't get confused
             img.removeAttribute('srcset'); 
             img.removeAttribute('loading');
