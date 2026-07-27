@@ -392,7 +392,9 @@ const DATA = {
       {name:"Chemistry", icon:"🧪", url:"ncert-solutions-for-class-11-chemistry/", cat:"ncert"},
       {name:"Biology", icon:"🧬", url:"ncert-solutions-for-class-11-biology/", cat:"ncert"},
       {name:"English", icon:"🔤", url:"ncert-solutions-for-class-11-english/", cat:"ncert"},
-      {name:"RD Sharma Maths", icon:"📐", url:"rd-sharma-class-11-solutions/", cat:"rd"}
+      {name:"RD Sharma Maths", icon:"📐", url:"rd-sharma-class-11-solutions/", cat:"rd"},
+      {name:"TS GREWAL ACCOUNTS", icon:"📐", url:"https://ncertsolutions.guru/ts-grewal-accountancy-class-11-solutions/", cat:"ts"}
+
   ]},
   12: { label:"Class 12", subjects:[
       {name:"Overview", icon:"📘", url:"ncert-solutions-for-class-12/", cat:"ncert"},
@@ -401,7 +403,9 @@ const DATA = {
       {name:"Biology", icon:"🧬", url:"ncert-solutions-for-class-12-biology/", cat:"ncert"},
       {name:"History", icon:"🏛️", url:"ncert-solutions-for-class-12-history/", cat:"ncert"},
       {name:"English", icon:"🔤", url:"ncert-solutions-for-class-12-english/", cat:"ncert"},
-      {name:"RD Sharma Maths", icon:"📐", url:"rd-sharma-class-12-solutions/", cat:"rd"}
+      {name:"RD Sharma Maths", icon:"📐", url:"rd-sharma-class-12-solutions/", cat:"rd"},
+      {name:"TS GREWAL ACCOUNTS", icon:"📐", url:"https://ncertsolutions.guru/ts-grewal-accountancy-class-12-solutions/", cat:"ts"}
+
   ]}
 };
 
@@ -415,7 +419,9 @@ const EXTRA_RESOURCES = [
   {name:"MCQ Questions", icon:"❓", url:"mcq-questions/", cat:"extra"},
   {name:"Extra Questions", icon:"➕", url:"extra-questions/", cat:"extra"},
   {name:"CUET Exam", icon:"🎓", url:"cuet-exam/", cat:"extra"},
-  {name:"CBSE LEARN", icon:"🎓", url:"https://www.learncbse.in", cat:"extra"}
+  {name:"CBSE LEARN", icon:"📝", url:"https://www.learncbse.in", cat:"extra"},
+  {name:"Solution Guru", icon:"📝", url:"https://ncertsolutions.guru/", cat:"extra"}
+
 ];
 
 // Chhattisgarh Board (CGBSE) - separate section, distinct from the generic
@@ -1044,12 +1050,16 @@ async function loadPage(targetUrl, historyIndex = -1, clickedText = null) {
             img.removeAttribute('loading');
             img.removeAttribute('data-src');
 
-            // 3. Cap size so icons/images that lose their site's CSS never
-            // render at their raw native (sometimes huge) size.
-            img.style.maxWidth = '100%';
-            img.style.maxHeight = '400px';
+            // 3. Scale to container width (not an arbitrary height cap, which
+            // was shrinking legitimate tall page-scan/worksheet images far
+            // smaller than intended). Icon/nav images are already filtered
+            // out above by filename pattern, so remaining images are real
+            // content and should size close to the container's width.
+            img.style.maxWidth = '95%';
+            img.style.width = '95%';
             img.style.height = 'auto';
-            img.style.width = 'auto';
+            img.style.display = 'block';
+            img.style.margin = '20px auto';
             img.removeAttribute('data-lazy-src');
             img.removeAttribute('data-opt-src');
             
