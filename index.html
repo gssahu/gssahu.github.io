@@ -894,31 +894,6 @@ async function loadPage(targetUrl, historyIndex = -1, clickedText = null) {
                 // the rest load only when the user clicks "next" on the live
                 // site. Detect purely from the URL (reliable) rather than
                 // scraped DOM classes (fragile, can vary by fetch/build).
-                const isVedantuPaginatedViewer = /vedantu\.com/i.test(targetUrl) && /\/revision-notes\//i.test(targetUrl);
-
-                if (isVedantuPaginatedViewer) {
-                    loader.style.display = 'none';
-                    toolbarDiv.style.display = 'flex';
-                    container.innerHTML = `
-                        <div style="text-align:center; padding:60px 20px;">
-                            <div style="font-size:3rem; margin-bottom:16px;">📖</div>
-                            <div style="font-size:1.1rem; margin-bottom:8px;">This page uses a multi-page viewer that only loads one page at a time here.</div>
-                            <div style="color:var(--muted); margin-bottom:24px;">It should have opened in a new tab automatically. If not, tap below.</div>
-                            <a class="secondary" href="${targetUrl}" target="_blank" rel="noopener" style="text-decoration:none; display:inline-flex; align-items:center; padding:12px 24px; border-radius:8px; font-size:1rem;">
-                                ↗ Open Full Document in New Tab
-                            </a>
-                        </div>`;
-                    window.open(targetUrl, '_blank', 'noopener');
-
-                    let fallbackTitle = clickedText ? clickedText : "Document";
-                    if (historyIndex === -1) {
-                        pageHistory.push({ url: targetUrl, title: fallbackTitle });
-                    } else {
-                        pageHistory = pageHistory.slice(0, historyIndex + 1);
-                    }
-                    renderBreadcrumbs();
-                    return; // EXIT EARLY: skip fetch/scraping entirely
-                }
 
                 if (isGoogleDrive || isPdf) {
                     loader.style.display = 'none';
@@ -977,25 +952,129 @@ async function loadPage(targetUrl, historyIndex = -1, clickedText = null) {
                 // ------------------------------------------
 
 
-
-        // Normal proxy fetch
-        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
-        const response = await fetch(proxyUrl);
-        if (!response.ok) throw new Error(`Proxy blocked. Status: ${response.status}`);
+// --- RESILIENT FETCH LOGIC ---
+        let response;
+        let rawHtml = "";
         
-        const rawHtml = await response.text();
+        // 1. Try standard proxy
+        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+        response = await fetch(proxyUrl);
+        
+        // 2. If payload is too large (413), try a heavy-duty backup proxy
+        if (response.status === 413) {
+            const backupProxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
+            response = await fetch(backupProxy);
+        }
+
+        // 3. If BOTH proxies fail, and it's a Vedantu page, use the Direct Image Extractor as a last resort
+        if (!response.ok) {
+            if (targetUrl.includes('vedantu.com')) {
+                loader.style.display = 'none';
+                toolbarDiv.style.display = 'none';
+                
+                const urlObj = new URL(targetUrl);
+                let path = urlObj.pathname;
+                if (path.endsWith('/')) path = path.slice(0, -1);
+                const imgBaseUrl = `https://www.vedantu.com/content-images${path}/`;
+                
+                let htmlContent = `<div style="text-align:center; max-width: 800px; margin: 0 auto; padding: 20px;">`;
+                htmlContent += `<h2 style="margin-bottom: 20px; color: var(--text);">${clickedText || 'Document'}</h2>`;
+                for (let i = 1; i <= 40; i++) {
+                    htmlContent += `<img src="${imgBaseUrl}${i}.webp" onerror="this.style.display='none'" style="width: 100%; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-radius: 8px;">`;
+                }
+                htmlContent += `</div>`;
+                container.innerHTML = htmlContent;
+
+                let titleText = clickedText ? clickedText : "Vedantu Notes";
+                if (historyIndex === -1) pageHistory.push({ url: targetUrl, title: titleText });
+                else pageHistory = pageHistory.slice(0, historyIndex + 1);
+                renderBreadcrumbs();
+                return; // Exit early since we brute-forced the images
+            }
+            
+            // If it's not Vedantu or we can't handle it, throw standard error
+            throw new Error(`Proxy blocked. Status: ${response.status}`);
+        }
+
+        rawHtml = await response.text();
+        // -----------------------------
         const parser = new DOMParser();
         const doc = parser.parseFromString(rawHtml, 'text/html');
 
         const elementsToRemove = [
+            // Standard clutter
             'header', 'footer', 'nav', 'aside', 'iframe', 'script', 'style', 
             'link', '.sidebar', '.widget-area', '.comments-area', '#comments',
             '.ez-toc-container', '.adsbygoogle', '.ast-header-breadcrumb',
-            'a[href^="tel:"]', 'a[href^="mailto:"]'
+            'a[href^="tel:"]', 'a[href^="mailto:"]',
+            
+            // --- NEW: SPA & Vedantu Specific Junk Filters ---
+            'div[class*="Header_"]',       // Top navigation
+            'div[class*="Footer_"]',       // Bottom links
+            'div[class*="Sidebar_"]',      // Study Materials side columns
+            'div[class*="RightColumn_"]',  // Right-hand sidebars
+            'div[class*="Breadcrumb_"]',   // "NCERT > Class 1 > Maths" text
+            'div[class*="Banner_"]',       // Marketing banners
+            'div[class*="Demo_"]',         // "Book Free Demo" popups
+            'div[class*="Promo_"]',        // Promotions
+            'div[class*="Sticky_"]',       // Sticky bottom bars
+            'div[class*="Navigation_"]',   // Mobile menus
+            'div[class*="Menu_"]',         // Store / More menus
+            'div[class*="SocialShare_"]',  // Share on Facebook/WhatsApp buttons
+            'div[class*="Related_"]',       // "Related Articles" links
+            'div[class*="InterLinkingWidgets_"]'       // "Related Articles" links
+
         ];
         elementsToRemove.forEach(selector => doc.querySelectorAll(selector).forEach(el => el.remove()));
 
-        let mainContent = doc.querySelector('.entry-content') || doc.querySelector('article') || doc.body;
+// 1. Grab the broadest containers first so we never lose the text!
+        let mainContent = doc.querySelector('article') || 
+                          doc.querySelector('main') || 
+                          doc.querySelector('.entry-content') || 
+                          doc.querySelector('.PdfViewer_pdfViewer__uxDeW') || 
+                          doc.body;
+
+        // --- BULLETPROOF VEDANTU ENGINE ---
+        if (targetUrl.includes('vedantu.com')) {
+            // Step A: Destroy all of Vedantu's broken/empty PDF containers
+            const brokenContainers = mainContent.querySelectorAll('.PdfViewer_pdfViewer__uxDeW, #download-pdf-id, #download-pdf-wrapper, .ImageModule_DownloadPdfWrapper__OtFm1');
+            brokenContainers.forEach(el => el.remove());
+
+            // Step B: Generate the exact image server URL using the address bar
+            const urlObj = new URL(targetUrl);
+            let path = urlObj.pathname;
+            if (path.endsWith('/')) path = path.slice(0, -1);
+            const imgBaseUrl = `https://www.vedantu.com/content-images${path}/`;
+
+            // Step C: Create our own custom, clean viewer container
+            let customViewer = document.createElement('div');
+            customViewer.style.backgroundColor = "var(--panel2)";
+            customViewer.style.padding = "20px";
+            customViewer.style.borderRadius = "12px";
+            customViewer.style.marginBottom = "30px";
+            customViewer.style.border = "1px solid var(--border)";
+            
+            // Step D: Brute-force 40 pages into it
+            for (let i = 1; i <= 40; i++) {
+                let img = document.createElement('img');
+                img.setAttribute('src', `${imgBaseUrl}${i}.webp`);
+                
+                // The magic trick: If page 6 doesn't exist, it deletes itself automatically
+                img.setAttribute('onerror', "this.style.display='none'"); 
+                
+                img.style.width = "100%";
+                img.style.display = "block";
+                img.style.marginBottom = "20px";
+                img.style.borderRadius = "8px";
+                img.style.boxShadow = "0 4px 6px rgba(0,0,0,0.1)";
+                
+                customViewer.appendChild(img);
+            }
+
+            // Step E: Inject our perfect viewer at the very top of the page text
+            mainContent.insertBefore(customViewer, mainContent.firstChild);
+        }
+        // ----------------------------------------
 
         // Some sites (e.g. Vedantu) leave nav-chrome elements like phone
         // numbers and dropdown arrow icons outside <nav>/<header>, so the
