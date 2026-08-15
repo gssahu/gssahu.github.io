@@ -1002,6 +1002,151 @@ async function loadPage(targetUrl, historyIndex = -1, clickedText = null) {
         rawHtml = await response.text();
 
 // =====================================================
+// SELFSTUDYS PDF EXTRACTOR
+// =====================================================
+if (/selfstudys\.com/i.test(targetUrl)) {
+
+    try {
+
+        // Parse the downloaded SelfStudys HTML
+        const tempDoc = new DOMParser()
+            .parseFromString(rawHtml, "text/html");
+
+        // Find the PDF flip viewer
+        const pdfContainer =
+            tempDoc.querySelector(
+                '#PDFF[source], .PDFFlip[source]'
+            );
+
+        if (pdfContainer) {
+
+            // Extract source attribute
+            const actualPdfUrl =
+                pdfContainer.getAttribute("source");
+
+            console.log("===== SELFSTUDYS PDF =====");
+            console.log("Page :", targetUrl);
+            console.log("PDF  :", actualPdfUrl);
+            console.log("==========================");
+
+            if (actualPdfUrl) {
+
+                loader.style.display = "none";
+                toolbarDiv.style.display = "flex";
+
+                // Google PDF Viewer
+                const iframeUrl =
+                    "https://docs.google.com/viewerng/viewer?url=" +
+                    encodeURIComponent(actualPdfUrl) +
+                    "&embedded=true";
+
+                container.innerHTML = `
+                    <iframe
+                        id="pdfFrame"
+                        src="${iframeUrl}"
+                        width="100%"
+                        height="800px"
+                        allowfullscreen
+                        style="
+                            border:none;
+                            border-radius:8px;
+                            box-shadow:0 4px 6px rgba(0,0,0,.1);
+                        ">
+                    </iframe>
+
+                    <div style="
+                        text-align:center;
+                        margin-top:8px;
+                        display:flex;
+                        gap:10px;
+                        justify-content:center;
+                        flex-wrap:wrap;
+                    ">
+
+                        <button
+                            class="secondary"
+                            onclick="
+                                const f =
+                                    document.getElementById('pdfFrame');
+                                if (f) f.src = f.src;
+                            ">
+                            🔄 Retry PDF
+                        </button>
+
+                        <a
+                            class="secondary"
+                            href="${actualPdfUrl}"
+                            target="_blank"
+                            rel="noopener"
+                            style="
+                                text-decoration:none;
+                                display:inline-flex;
+                                align-items:center;
+                                padding:8px 14px;
+                                border-radius:8px;
+                            ">
+                            ↗ Open Original PDF
+                        </a>
+
+                    </div>
+                `;
+
+                // Retry viewer once after loading
+                setTimeout(() => {
+
+                    const f =
+                        document.getElementById("pdfFrame");
+
+                    if (f) {
+                        f.src = f.src;
+                    }
+
+                }, 3500);
+
+                // History
+                const titleText =
+                    clickedText || "SelfStudys PDF";
+
+                if (historyIndex === -1) {
+
+                    pageHistory.push({
+                        url: targetUrl,
+                        title: titleText
+                    });
+
+                } else {
+
+                    pageHistory =
+                        pageHistory.slice(
+                            0,
+                            historyIndex + 1
+                        );
+                }
+
+                renderBreadcrumbs();
+
+                return;
+            }
+        }
+
+        console.warn(
+            "SelfStudys PDF source not found"
+        );
+
+    } catch (error) {
+
+        console.error(
+            "SelfStudys PDF extraction failed:",
+            error
+        );
+
+        // Continue with normal HTML processing
+    }
+}
+// =====================================================
+
+
+// =====================================================
 // SUPERCOP - EXTRACT PDF PARAMETERS FROM PAGE
 // =====================================================
 if (/supercop\.in\/ncert-solutions\//i.test(targetUrl)) {
