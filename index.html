@@ -1000,6 +1000,179 @@ async function loadPage(targetUrl, historyIndex = -1, clickedText = null) {
         }
 
         rawHtml = await response.text();
+
+// =====================================================
+// SUPERCOP - EXTRACT PDF PARAMETERS FROM PAGE
+// =====================================================
+if (/supercop\.in\/ncert-solutions\//i.test(targetUrl)) {
+
+    try {
+
+        // Parse the downloaded Supercop HTML
+        const tempDoc = new DOMParser()
+            .parseFromString(rawHtml, "text/html");
+
+        let header = null;
+        let name = null;
+        let CName = null;
+        let pName = null;
+        let web = null;
+
+        // Find the script containing CName / pName
+        const scripts = tempDoc.querySelectorAll("script");
+
+        for (const script of scripts) {
+
+            const text = script.textContent || "";
+
+            if (
+                /\bCName\s*=/.test(text) &&
+                /\bpName\s*=/.test(text)
+            ) {
+
+                const getValue = (variable) => {
+
+                    const regex = new RegExp(
+                        "\\b" + variable +
+                        "\\s*=\\s*[\"']([^\"']*)[\"']",
+                        "i"
+                    );
+
+                    const match = text.match(regex);
+
+                    return match ? match[1] : null;
+                };
+
+                header = getValue("header");
+                name   = getValue("name");
+                CName  = getValue("CName");
+                pName  = getValue("pName");
+                web    = getValue("web");
+
+                break;
+            }
+        }
+
+        console.log("===== SUPERCOP PARAMETERS =====");
+        console.log("header :", header);
+        console.log("name   :", name);
+        console.log("CName  :", CName);
+        console.log("pName  :", pName);
+        console.log("web    :", web);
+        console.log("================================");
+
+        if (CName && pName) {
+
+            // Supercop Adobe viewer uses files.supercop.in
+            const pdfHost = "https://files.supercop.in";
+
+            const actualPdfUrl =
+                pdfHost + "/" +
+                (header || "ncert-solutions") + "/" +
+                CName + "/" +
+                pName + ".pdf";
+
+            console.log(
+                "SUPERCOP ACTUAL PDF:",
+                actualPdfUrl
+            );
+
+            // -------------------------------------------------
+            // Display PDF
+            // -------------------------------------------------
+
+            loader.style.display = "none";
+            toolbarDiv.style.display = "flex";
+
+            const iframeUrl =
+                "https://docs.google.com/viewerng/viewer?url=" +
+                encodeURIComponent(actualPdfUrl) +
+                "&embedded=true";
+
+            container.innerHTML = `
+                <iframe
+                    id="pdfFrame"
+                    src="${iframeUrl}"
+                    width="100%"
+                    height="800px"
+                    allowfullscreen
+                    style="
+                        border:none;
+                        border-radius:8px;
+                        box-shadow:0 4px 6px rgba(0,0,0,.1);
+                    ">
+                </iframe>
+
+                <div style="
+                    text-align:center;
+                    margin-top:8px;
+                    display:flex;
+                    gap:10px;
+                    justify-content:center;
+                    flex-wrap:wrap;
+                ">
+
+                    <button
+                        class="secondary"
+                        onclick="
+                            const f =
+                                document.getElementById('pdfFrame');
+                            if (f) f.src = f.src;
+                        ">
+                        🔄 Retry PDF
+                    </button>
+
+                    <a
+                        class="secondary"
+                        href="${actualPdfUrl}"
+                        target="_blank"
+                        rel="noopener"
+                        style="
+                            text-decoration:none;
+                            display:inline-flex;
+                            align-items:center;
+                            padding:8px 14px;
+                            border-radius:8px;
+                        ">
+                        ↗ Open Original PDF
+                    </a>
+
+                </div>
+            `;
+
+            if (historyIndex === -1) {
+
+                pageHistory.push({
+                    url: targetUrl,
+                    title: name || clickedText || "PDF Document"
+                });
+
+            } else {
+
+                pageHistory =
+                    pageHistory.slice(0, historyIndex + 1);
+            }
+
+            renderBreadcrumbs();
+
+            return;
+        }
+
+        console.warn(
+            "Supercop CName/pName not found"
+        );
+
+    } catch (error) {
+
+        console.error(
+            "Supercop parameter extraction failed:",
+            error
+        );
+
+        // Continue with normal page processing
+    }
+}
+// =====================================================
         // -----------------------------
         const parser = new DOMParser();
         const doc = parser.parseFromString(rawHtml, 'text/html');
