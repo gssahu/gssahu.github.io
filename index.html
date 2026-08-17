@@ -955,23 +955,51 @@ async function loadPage(targetUrl, historyIndex = -1, clickedText = null) {
                 // ------------------------------------------
 
 
-// --- RESILIENT FETCH LOGIC ---
+// --- RESILIENT FETCH LOGIC (PERSONAL GOOGLE PROXY) ---
         let response;
         let rawHtml = "";
         
-        // 1. Try standard proxy
-        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
-        response = await fetch(proxyUrl);
-        
-        // 2. If payload is too large (413), try a heavy-duty backup proxy
-        if (response.status === 413) {
-            const backupProxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
-            response = await fetch(backupProxy);
+        // 1. Decode to pure text (removes double encoding)
+        let cleanUrl = targetUrl;
+        try {
+            cleanUrl = decodeURIComponent(targetUrl);
+            if (cleanUrl.includes('%25')) cleanUrl = decodeURIComponent(cleanUrl);
+        } catch (e) {
+            console.warn("Could not decode URL, using original.");
         }
 
-        // 3. If BOTH proxies fail, and it's a Vedantu page, use the Direct Image Extractor as a last resort
-        if (!response.ok) {
+        // 2. Paste your Google Script URL here!
+        const MY_GOOGLE_PROXY = "https://script.google.com/macros/s/AKfycbzRvHU2zcsdI_3ePK4-_-QbFOtbBtgDikTVM3_ew4wa9dZbbC_w5b1C6R-oKHOfTa0g/exec";
+        
+        try {
+            // Tell your Google Script to fetch the clean Hindi URL
+            const fetchUrl = `${MY_GOOGLE_PROXY}?url=${encodeURIComponent(cleanUrl)}`;
+            response = await fetch(fetchUrl);
+            
+            if (!response.ok) throw new Error(`Google Proxy failed: ${response.status}`);
+            
+            //rawHtml = await response.text();
+            
+            // If the proxy returns the error text we wrote in the script
+            if (rawHtml.startsWith("Error:")) throw new Error(rawHtml);
+            
+        } catch (error) {
+            console.error("Fetch failed:", error);
+            
+            // --- FIREWALL BYPASS INTERCEPTOR ---
+            if (targetUrl.includes('ncertstudy.com')) {
+                loader.style.display = 'none';
+                toolbarDiv.style.display = 'flex';
+                // ... (Keep your Firewall Bypass Screen UI exactly as it is) ...
+                return;
+            }
+            throw new Error(`All proxies blocked.`);
+        }
+        // ----------------------------------------
+        // 3. If ALL proxies fail, trigger Vedantu fallback
+        if (!response || !response.ok) {
             if (targetUrl.includes('vedantu.com')) {
+                // ... (Keep your Vedantu image extractor code exactly as it is below this line) ...
                 loader.style.display = 'none';
                 toolbarDiv.style.display = 'none';
                 
@@ -1000,6 +1028,77 @@ async function loadPage(targetUrl, historyIndex = -1, clickedText = null) {
         }
 
         rawHtml = await response.text();
+
+// =====================================================
+// NCERTSTUDY PDF EXTRACTOR
+// =====================================================
+if (/ncertstudy\.com/i.test(targetUrl)) {
+    try {
+        const tempDoc = new DOMParser().parseFromString(rawHtml, "text/html");
+        
+        // --- UPGRADED PDF HUNTER ---
+        // Instead of just looking for '#download', it now hunts for any link that ends in .pdf
+        // This catches the documents even when the website forgets to name their buttons properly!
+        const downloadLink = tempDoc.querySelector(
+            '#download[href], a#download[href], a[href$=".pdf" i], a[href*=".pdf?" i]'
+        );
+
+        if (downloadLink) {
+            const rawHref = downloadLink.getAttribute("href");
+            if (!rawHref) throw new Error("NCERTStudy download href is empty");
+
+            let downloadUrl = new URL(rawHref, targetUrl).href;
+
+            console.log("===== NCERTSTUDY =====");
+            console.log("RAW HREF:", rawHref);
+            console.log("FINAL URL:", downloadUrl);
+            console.log("======================");
+
+            loader.style.display = "none";
+            toolbarDiv.style.display = "flex";
+
+            // Safe encoding for Google Viewer
+            let safeQueryParam = encodeURIComponent(downloadUrl);
+            safeQueryParam = safeQueryParam.replace(/%25/g, '%');
+
+            const iframeUrl = "https://docs.google.com/viewerng/viewer?url=" + safeQueryParam + "&embedded=true";
+
+            container.innerHTML = `
+                <iframe
+                    id="pdfFrame"
+                    src="${iframeUrl}"
+                    width="100%"
+                    height="800px"
+                    allowfullscreen
+                    style="border:none; border-radius:8px; box-shadow:0 4px 6px rgba(0,0,0,.1);">
+                </iframe>
+
+                <div style="text-align:center; margin-top:8px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+                    <button class="secondary" onclick="const f = document.getElementById('pdfFrame'); if(f) f.src = f.src;">
+                        🔄 Retry PDF
+                    </button>
+                    <a class="secondary" href="${downloadUrl}" target="_blank" rel="noopener" style="text-decoration:none; display:inline-flex; align-items:center; padding:8px 14px; border-radius:8px;">
+                        ↗ Open / Download
+                    </a>
+                </div>
+            `;
+
+            const titleText = clickedText || "NCERTStudy PDF";
+            if (historyIndex === -1) {
+                pageHistory.push({ url: targetUrl, title: titleText });
+            } else {
+                pageHistory = pageHistory.slice(0, historyIndex + 1);
+            }
+
+            renderBreadcrumbs();
+            return;
+        }
+        console.warn("NCERTStudy PDF link not found on this page.");
+    } catch (error) {
+        console.error("NCERTStudy PDF extraction failed:", error);
+    }
+}
+// =====================================================
 
 // =====================================================
 // SELFSTUDYS PDF EXTRACTOR
