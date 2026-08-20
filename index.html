@@ -431,6 +431,10 @@ const CGBOARD_RESOURCES = [
   {name:"CG Text Book 2024-25 (Hindi Medium)", icon:"📘", url:"https://scert.cg.gov.in/pdf/textbook-2024-25/textbook-2024-25.htm", cat:"cgboard"},
   {name:"CG Text Book Chapterwise (Hindi Medium)", icon:"📘", url:"https://www.evidyarthi.in/chhattisgarh-board/chhattisgarh-board-books/", cat:"cgboard"}
 ];
+// MPBoard - separate section, distinct from the generic
+const MPBOARD_RESOURCES = [
+  {name:"MP Board LEARN(evidyrthi.in)", icon:"📘", url:"https://www.evidyarthi.in/mp-board/mp-board/", cat:"mpboard"},
+];
 
 function loadSet(key){ try{ return new Set(JSON.parse(localStorage.getItem(key)||"[]")); }catch(e){ return new Set(); } }
 function saveSet(key, set){ localStorage.setItem(key, JSON.stringify([...set])); }
@@ -448,6 +452,7 @@ function allLinks(){
   Object.keys(DATA).forEach(c=>{ DATA[c].subjects.forEach(s=> out.push({cls:c, ...s})); });
   EXTRA_RESOURCES.forEach(r=> out.push({cls:null, ...r}));
   CGBOARD_RESOURCES.forEach(r=> out.push({cls:null, ...r}));
+  MPBOARD_RESOURCES.forEach(r=> out.push({cls:null, ...r}));
   return out;
 }
 
@@ -552,6 +557,10 @@ function render(){
 
         html += `<div class="section-title" style="margin-top:36px">🟢 Chhattisgarh Board (CGBSE) <span class="pill">${CGBOARD_RESOURCES.length}</span></div><ul class="linklist">`;
         CGBOARD_RESOURCES.forEach(r=> html += linkHTML({cls:null,...r}, r.name));
+        html += `</ul>`;
+
+		html += `<div class="section-title" style="margin-top:36px">🟢 MP Board <span class="pill">${MPBOARD_RESOURCES.length}</span></div><ul class="linklist">`;
+        MPBOARD_RESOURCES.forEach(r=> html += linkHTML({cls:null,...r}, r.name));
         html += `</ul>`;
       }
     }
